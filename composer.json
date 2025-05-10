@@ -13,8 +13,23 @@
       "email" : "valiknik225@gmail.com"
     }
   ],
-  "type": "component",
-  "homepage": "https://docs.ufo-tech.space/bin/view/docs/JsonRpcBundle/?language=en",
+  "type" : "library",
+  "keywords": [
+    "dto",
+    "data transfer object",
+    "value object",
+    "transformer",
+    "hydrator",
+    "serializer",
+    "deserializer",
+    "array",
+    "php",
+    "json",
+    "rpc",
+    "symfony",
+    "ufo"
+  ],
+  "homepage": "https://docs.ufo-tech.space/bin/view/docs/DTOTransformer/?language=en",
   "require": {
     "php": ">=8.3",
     "symfony/validator": "^7.2"
