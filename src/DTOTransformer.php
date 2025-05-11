@@ -12,10 +12,12 @@ use Ufo\DTO\Interfaces\IArrayConvertible;
 use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
 use Ufo\DTO\Interfaces\IDTOToArrayTransformer;
 use Ufo\DTO\Helpers\TypeHintResolver;
+use Ufo\DTO\VO\TransformKeyVO;
 
 use function array_key_exists;
 use function array_map;
 use function gettype;
+use function is_object;
 
 class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayTransformer,  IDTOFromArrayTransformer
 {
@@ -24,18 +26,22 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
      * Converts a DTO object to an associative array.
      *
      * @param object $dto The object to convert.
+     * @param array<string,string|null> $renameKey
+     *
      * @return array An associative array of the object's properties.
      */
-    public static function toArray(object $dto): array
+    public static function toArray(object $dto, array $renameKey = []): array
     {
         $reflection = new ReflectionClass($dto);
         $properties = $reflection->getProperties();
         $array = [];
 
         foreach ($properties as $property) {
+            $keys = static::getPropertyKey($property, $renameKey);
+            if (!$keys->dataKey) continue;
             $value = $property->getValue($dto);
             $value = static::convertValue($value);
-            $array[$property->getName()] = $value;
+            $array[$keys->dataKey] = $value;
         }
 
         return $array;
@@ -64,36 +70,42 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         $instance = null;
         $reflectionClass = new ReflectionClass($classFQCN);
         $constructParams = [];
-        $hasReadonly = false;
+        $hasReadonly = static::checkReadonlyInClass($reflectionClass);
         $constructor = $reflectionClass->getConstructor();
 
         if ($constructor && $constructor->isPublic()) {
             foreach ($constructor->getParameters() as $param) {
-                $key = static::getPropertyKey($param, $renameKey);
-                if (!$key) continue;
-                $constructParams[$key] = static::extractValue($key, $data, $param, $classFQCN);
-                try {
-                    if ($reflectionClass->getProperty($key)->isReadOnly()) {
-                        $hasReadonly = true;
-                    }
-                } catch (\Throwable) {}
+                $keys = static::getPropertyKey($param, $renameKey);
+                if (!$keys->dataKey) continue;
+                $constructParams[$keys->dtoKey] = static::extractValue($keys->dataKey, $data, $param, $classFQCN);
             }
             if ($hasReadonly) $instance = $reflectionClass->newInstanceArgs($constructParams);
         }
         $instance = $instance ?? $reflectionClass->newInstanceWithoutConstructor();
 
         foreach ($reflectionClass->getProperties() as $property) {
-            $key = static::getPropertyKey($property, $renameKey);
+            $keys = static::getPropertyKey($property, $renameKey);
 
-            if (!$key || $property->isReadOnly() || ($hasReadonly && array_key_exists($key, $constructParams))) {
+            if (!$keys->dataKey || $property->isReadOnly() || ($hasReadonly && array_key_exists($keys->dtoKey, $constructParams))) {
                 continue;
             }
 
-            $value = static::extractValue($key, $data, $property, $classFQCN);
+            $value = static::extractValue($keys->dataKey, $data, $property, $classFQCN);
             $property->setValue($instance, $value);
         }
 
         return $instance;
+    }
+
+    protected static function checkReadonlyInClass(ReflectionClass $reflectionClass): bool
+    {
+        $hasReadonly = false;
+        foreach ($reflectionClass->getProperties() as $property) {
+            if ($property->isReadOnly()) {
+                $hasReadonly = true;
+            }
+        }
+        return $hasReadonly;
     }
 
     public static function isSupportClass(string $classFQCN): bool
@@ -153,12 +165,18 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
                 $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property);
             } catch (\ValueError) {}
         }
+        try {
+            if (TypeHintResolver::isRealClass($property->getType()->getName()) && !is_object($value)) {
+                $value = static::transformFromArray($property->getType()->getName(), $value);
+            }
+        } catch (\Throwable) {}
         return $value;
     }
 
-    protected static function getPropertyKey(ReflectionProperty|ReflectionParameter $property, array $renameKey): ?string
+    protected static function getPropertyKey(ReflectionProperty|ReflectionParameter $property, array $renameKey): TransformKeyVO
     {
-        $pName = $property->getName();
-        return array_key_exists($pName, $renameKey) ? $renameKey[$pName] : $pName;
+        $dtoKey = $property->getName();
+        $dataKey = array_key_exists($dtoKey, $renameKey) ? $renameKey[$dtoKey] : $dtoKey;
+        return new TransformKeyVO($dtoKey, $dataKey);
     }
 }

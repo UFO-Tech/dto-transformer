@@ -1,0 +1,112 @@
+<?php
+
+namespace Ufo\DTO\Tests;
+
+use PHPUnit\Framework\Attributes\RequiresMethod;
+use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
+use ReflectionProperty;
+use Ufo\DTO\Attributes\AttrDTO;
+use Ufo\DTO\DTOAttributesEnum;
+use Ufo\DTO\Exceptions\BadParamException;
+use Ufo\DTO\Tests\Fixtures\DTO\MemberDto;
+use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
+use Ufo\DTO\Tests\Fixtures\DTO\ValidDTO;
+use Ufo\DTO\Tests\Fixtures\UpperTransformer;
+
+class DTOAttributesEnumTest extends TestCase
+{
+    public function testCases(): void
+    {
+
+        $property = new ReflectionProperty(UserDto::class, 'name');
+        $method = new ReflectionMethod(self::class, 'getMemberDto');
+        $attribute = $method->getAttributes()[0];
+
+        $result = DTOAttributesEnum::tryFromAttr($attribute, ["name" => 'ok', 'email' => 'q'], $property);
+        $this->assertSame('ok', $result->name);
+    }
+
+    public function testValidateThrows(): void
+    {
+        $property = new ReflectionProperty(ValidDTO::class, 'name');
+        $attribute = $property->getAttributes()[0];
+
+        $res = DTOAttributesEnum::tryFromAttr($attribute, 'xxxx', $property);
+        $this->assertSame('xxxx', $res);
+        $this->expectException(BadParamException::class);
+        DTOAttributesEnum::tryFromAttr($attribute, 'ss', $property);
+    }
+
+    public function testTransformDto(): void
+    {
+        $property = new ReflectionProperty(MemberWithFriendsDTO::class, 'user');
+        $method = new ReflectionMethod(self::class, 'getMemberDto');
+        $attribute = $method->getAttributes()[0];
+
+        $data =
+            ['name' => 'testName1', 'email' => 'testEmail1']
+        ;
+
+        $user = DTOAttributesEnum::tryFromAttr($attribute, $data, $property);
+
+        $this->assertInstanceOf(MemberDto::class, $user);
+        $this->assertSame('testName1', $user->name);
+        $this->assertSame('testEmail1', $user->email);
+    }
+
+    public function testTransformDtoCollection(): void
+    {
+        $property = new ReflectionProperty(MemberWithFriendsDTO::class, 'friends');
+        $method = new ReflectionMethod(self::class, 'getMemberDtoCollection');
+        $attribute = $method->getAttributes()[0];
+
+        $data = [
+            ['name' => 'testName1', 'email' => 'testEmail1'],
+            ['name' => 'testName2', 'email' => 'testEmail2'],
+        ];
+
+        $result = DTOAttributesEnum::tryFromAttr($attribute, $data, $property);
+
+        $this->assertIsArray($result);
+        $this->assertCount(2, $result);
+        $this->assertContainsOnlyInstancesOf(MemberDto::class, $result);
+        $this->assertSame('testName2', $result[1]->name);
+    }
+
+
+    #[AttrDTO(MemberDto::class)]
+    protected function getMemberDto(): UserDto
+    {
+        return new UserDto('testName', 'testEmail');
+    }
+
+    #[AttrDTO(MemberDto::class, collection: true)]
+    protected function getMemberDtoCollection(): array
+    {
+        return [
+            new UserDto('testName1', 'testEmail1'),
+            new UserDto('testName2', 'testEmail2'),
+        ];
+    }
+
+    #[AttrDTO(ValidDTO::class, transformerFQCN: UpperTransformer::class)]
+    protected function getCustomDTO(): array
+    {
+        return ['name' => 'lower_case'];
+    }
+
+    public function testFallbackToDTOTransformerWhenNoInterface(): void
+    {
+        $property = new ReflectionProperty(ValidDTO::class, 'name');
+        $method= new ReflectionMethod(self::class, 'getCustomDTO');
+        $attribute = $method->getAttributes()[0];
+
+        $result = DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomDTO(), $property);
+
+        $this->assertInstanceOf(ValidDTO::class, $result);
+        $this->assertSame('LOWER_CASE', $result->name);
+    }
+
+}

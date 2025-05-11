@@ -6,6 +6,7 @@ use function array_map;
 use function class_exists;
 use function implode;
 use function is_array;
+use function strtolower;
 
 enum TypeHintResolver: string
 {
@@ -33,12 +34,12 @@ enum TypeHintResolver: string
 
     public static function normalize(string $type): string
     {
-        return match ($type) {
+        return match (strtolower($type)) {
             self::ANY->value, self::MIXED->value => '',
-            self::ARR->name, self::ARRAY->value => self::ARRAY->value,
-            self::BOOL->value, self::TRUE->value, self::BOOLEAN->value, self::FALSE->value => self::BOOLEAN->value,
+            self::ARR->value, self::ARRAY->value => self::ARRAY->value,
+            self::BOOL->value, self::TRUE->value, self::BOOLEAN->value, self::FALSE->value => self::BOOL->value,
             self::DBL->value, self::DOUBLE->value, self::FLOAT->value => self::FLOAT->value,
-            self::INTEGER->value, self::INT->value => self::INTEGER->value,
+            self::INTEGER->value, self::INT->value => self::INT->value,
             self::NIL->value, self::NULL->value, self::VOID->value => self::NULL->value,
             self::STRING->value, self::STR->value => self::STRING->value,
             default => self::OBJECT->value
@@ -58,6 +59,9 @@ enum TypeHintResolver: string
     public static function jsonSchemaToPhp(array|string $type): string
     {
         if (is_array($type)) {
+            if (!isset($type['type']) && !isset($type['oneOf'])) {
+                throw new \InvalidArgumentException('Invalid schema: missing "type" or "oneOf" key');
+            }
             if ($type['oneOf'] ?? false) {
                 $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t['type']), $type['oneOf']);
                 $type = implode('|', $types);

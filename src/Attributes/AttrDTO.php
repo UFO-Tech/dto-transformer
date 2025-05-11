@@ -2,7 +2,10 @@
 
 namespace Ufo\DTO\Attributes;
 
-abstract class AttrDTO
+use Attribute;
+
+#[Attribute(Attribute::TARGET_METHOD|Attribute::TARGET_PROPERTY|Attribute::TARGET_PARAMETER)]
+class AttrDTO
 {
     public function __construct(
         public readonly string $dtoFQCN,

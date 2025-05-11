@@ -1,55 +1,56 @@
+
 ## 🧩 **ufo/dto-transformer**
 
-A PHP library that provides tools for **bidirectional transformation between DTO objects ⇄ arrays**, with full type safety, contracts, and flexible conversion logic. Ideal for JSON-RPC, REST APIs, CLI tools, and any context where data is passed as arrays.
+Бібліотека надає інструменти для **двосторонньої трансформації обʼєктів DTO ⇄ масиви**, з дотриманням типізації, контрактів та гнучкої логіки перетворення. Підходить для використання з JSON-RPC, REST API, CLI та іншими випадками, де дані передаються масивами.
 
 ---
 
-## 📦 Core Components:
+## 📦 Основні компоненти:
 
 ### 🔁 `DTOTransformer`
 
-Central service for:
+Центральний сервіс для:
 
-* transforming arrays into DTOs via `fromArray(...)`;
-* serializing DTOs to arrays via `toArray(...)`.
+* трансформації масиву у DTO через `fromArray(...)`;
+* серіалізації DTO у масив через `toArray(...)`.
 
 ### ⚙️ `IDTOFromArrayTransformer` + `IDTOToArrayTransformer`
 
-Interfaces for custom transformers that encapsulate specific logic for unpacking/packing particular DTOs.
+Інтерфейси для окремих кастомних трансформерів, які відповідають за специфічну логіку розпакування / пакування конкретних DTO.
 
 ### 🧱 `BaseDTOFromArrayTransformer`
 
-Base class with a default `fromArray()` implementation that includes:
+Базовий клас із типовою реалізацією `fromArray()`, яка включає:
 
-* support check via `supportsClass(...)`;
-* key renaming and data normalization;
-* constructor argument resolution and instantiation.
+* перевірку `supportsClass(...)`;
+* нормалізацію даних (наприклад, `renameKey`);
+* виклик реального конструктора обʼєкта.
 
 ### 🚨 `NotSupportDTOException`
 
-Thrown when a transformer does not support the provided DTO class.
+Викидається, якщо трансформер не підтримує переданий клас DTO.
 
 ---
 
-## 🧬 Contracts & Traits:
+## 🧬 Контракти та трейти:
 
 ### `IArrayConstructible` + `ArrayConstructibleTrait`
 
-For DTO classes that support construction from arrays:
+Для DTO-класів, які хочуть підтримувати `fromArray(...)`:
 
-* Maps constructor arguments automatically;
-* Works via `ReflectionParameter`.
+* Забезпечують виклик конструктора з відображенням аргументів;
+* Працюють з `ReflectionParameter`.
 
 ### `IArrayConvertible` + `ArrayConvertibleTrait`
 
-For DTO classes that can be serialized to arrays:
+Для DTO-класів, які мають `toArray()`:
 
-* Automatically serializes public and readonly properties;
-* Supports field aliasing and `#[DTOAttributesEnum::Hidden]`.
+* Автоматично серіалізують `public` і `readonly` властивості;
+* Підтримують перейменування ключів та `#[DTOAttributesEnum::Hidden]`.
 
 ---
 
-## 🔌 Usage Example:
+## 🔌 Як використовувати:
 
 ```php
 use Ufo\DTO\Attributes\AttrDTO;
@@ -149,9 +150,9 @@ $data = DTOTransformer::toArray($dto);
 
 ---
 
-## 🔧 Custom Transformer Example
+## 🔧 Кастомний трансформер:
 
-This is a sample **custom transformer** implementing `IDTOFromArrayTransformer` for transforming an `OrderDTO` where `amount` must be cast to float and `createdAt` to `DateTimeImmutable`.
+Ось приклад **кастомного трансформера**, який реалізує `IDTOFromArrayTransformer`, і перетворює DTO `OrderDTO`, у якого, наприклад, поле `amount` потрібно кастити в `float`, а `createdAt` — в `DateTimeImmutable`.
 
 ```php
 use Ufo\RpcObject\DTO\IDTOFromArrayTransformer;
@@ -166,13 +167,15 @@ class OrderDTO
     ) {}
 }
 
+
 final class OrderTransformer implements IDTOFromArrayTransformer
 {
     public static function fromArray(
         string $classFQCN,
         array $data,
         array $renameKey = []
-    ): object {
+    ): object 
+    {
         $data['amount'] = (float) $data['amount'];
         $data['createdAt'] = new DateTimeImmutable($data['createdAt']);
 
@@ -184,12 +187,18 @@ final class OrderTransformer implements IDTOFromArrayTransformer
         return is_a($classFQCN, OrderDTO::class, true);
     }
 }
+
+$data = [
+    'id' => 101,
+    'amount' => '199.90',
+    'createdAt' => '2025-05-09T20:00:00+03:00'
+];
+
+$dto = OrderTransformer::fromArray(OrderDTO::class, $data);
+
 ```
 
----
-
-### 🧩 With attribute-based transformer:
-
+Або:
 ```php
 use Ufo\DTO\Attributes\AttrDTO;
 
@@ -199,11 +208,12 @@ class MemberWithOrdersDTO implements IArrayConstructible, IArrayConvertible
     use ArrayConvertibleTrait;
 
     public function __construct(
-        public User $user,
+        public User $user
         #[AttrDTO(Order::class, collection: true, transformerFQCN: OrderTransformer::class)]
         public array $orders
     ) {}
 }
+
 
 $data = [
     'user' => [
@@ -224,21 +234,24 @@ $data = [
     ]
 ];
 
-$dto = DTOTransformer::fromArray(MemberWithOrdersDTO::class, $data);
+$dto = DTOTransformer::fromArray(OrderDTO::class, $data);
+
 ```
+---
 
-This transformer:
+Цей трансформер:
 
-* strictly follows `IDTOFromArrayTransformer`;
-* encapsulates complex conversion logic;
-* delegates array-to-object conversion to the core transformer.
+* не порушує контракт `IDTOFromArrayTransformer`;
+* централізує перетворення складних типів;
+* використовує `DTOTransformer::fromArray` як ядро.
+
 
 ---
 
-## 🧠 Library Advantages
+## 🧠 Переваги бібліотеки:
 
-* Full support for PHP 8.3 type system;
-* Flexible logic via pluggable custom transformers;
-* Type-safe, self-descriptive, and composable architecture;
-* Simple attribute-based field control without code duplication;
-* Standardized DTO handling for SOA and microservices environments.
+* Повна підтримка PHP 8.3 типізації;
+* Гнучка логіка трансформації через підтримку специфічних трансформерів;
+* Безпечна архітектура з чітким контролем типів;
+* Просте додавання атрибутів / перейменування полів без дублювання логіки;
+* Уніфікація обробки DTO в SOA / мікросервісній архітектурі.
