@@ -13,6 +13,7 @@ use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
 use Ufo\DTO\Interfaces\IDTOToArrayTransformer;
 use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\VO\TransformKeyVO;
+use Symfony\Component\Serializer\Attribute\Ignore;
 
 use function array_key_exists;
 use function array_map;
@@ -177,6 +178,9 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
     {
         $dtoKey = $property->getName();
         $dataKey = array_key_exists($dtoKey, $renameKey) ? $renameKey[$dtoKey] : $dtoKey;
+        if ($property->getAttributes(Ignore::class)[0] ?? null) {
+            $dataKey = null;
+        }
         return new TransformKeyVO($dtoKey, $dataKey);
     }
 }

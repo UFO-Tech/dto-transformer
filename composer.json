@@ -32,6 +32,7 @@
     "homepage": "https://docs.ufo-tech.space/bin/view/docs/DTOTransformer/?language=en",
     "require": {
         "php": ">=8.3",
+        "symfony/serializer": "7.2.*",
         "symfony/validator": "^7.2"
     },
     "require-dev": {

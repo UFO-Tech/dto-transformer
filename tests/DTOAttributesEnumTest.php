@@ -2,6 +2,7 @@
 
 namespace Ufo\DTO\Tests;
 
+use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\RequiresMethod;
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;
@@ -9,6 +10,9 @@ use ReflectionProperty;
 use Ufo\DTO\Attributes\AttrDTO;
 use Ufo\DTO\DTOAttributesEnum;
 use Ufo\DTO\Exceptions\BadParamException;
+use Ufo\DTO\Exceptions\NotSupportDTOException;
+use Ufo\DTO\Tests\Fixtures\AttrNoParent;
+use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberDto;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
@@ -92,21 +96,59 @@ class DTOAttributesEnumTest extends TestCase
     }
 
     #[AttrDTO(ValidDTO::class, transformerFQCN: UpperTransformer::class)]
-    protected function getCustomDTO(): array
+    protected function getCustomTransformerValidDTO(): array
     {
         return ['name' => 'lower_case'];
     }
 
-    public function testFallbackToDTOTransformerWhenNoInterface(): void
+    #[AttrDTO(DummyDTO::class, transformerFQCN: UpperTransformer::class)]
+    protected function getCustomTransformerInvalidDTO(): array
+    {
+        return ['name' => 'invalid_case'];
+    }
+
+    #[AttrNoParent()]
+    protected function getNoSupport(): array
+    {
+        return ['name' => 'no_support'];
+    }
+
+    public function testTransformByCustomTransformerByInterface(): void
     {
         $property = new ReflectionProperty(ValidDTO::class, 'name');
-        $method= new ReflectionMethod(self::class, 'getCustomDTO');
+        $method = new ReflectionMethod(self::class, 'getCustomTransformerValidDTO');
         $attribute = $method->getAttributes()[0];
 
-        $result = DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomDTO(), $property);
+        $result = DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomTransformerValidDTO(), $property);
 
         $this->assertInstanceOf(ValidDTO::class, $result);
         $this->assertSame('LOWER_CASE', $result->name);
     }
 
+    public function testFallbackByUnsupportedTransformerByInterface(): void
+    {
+        $property = new ReflectionProperty(DummyDTO::class, 'name');
+        $method= new ReflectionMethod(self::class, 'getCustomTransformerInvalidDTO');
+        $attribute = $method->getAttributes()[0];
+
+        $this->expectException(NotSupportDTOException::class);
+        DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomTransformerInvalidDTO(), $property);
+    }
+
+    public function testTryFromAttrThrowsWhenNoParentMatch(): void
+    {
+        $property = new \ReflectionProperty(DummyDTO::class, 'name');
+        $method= new ReflectionMethod(self::class, 'getNoSupport');
+        $attr = $method->getAttributes()[0];
+
+        $this->expectException(\ValueError::class);
+        $this->expectExceptionMessage('Unsupported attribute type');
+        DTOAttributesEnum::tryFromAttr($attr, 'any', $property);
+    }
+
+    public function testTransformDtoCollectionWithEmptyArray(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        ValidDTO::fromArray([]);
+    }
 }
