@@ -19,6 +19,7 @@ use function array_key_exists;
 use function array_map;
 use function gettype;
 use function is_object;
+use function Symfony\Component\String\s;
 
 class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayTransformer,  IDTOFromArrayTransformer
 {
@@ -163,7 +164,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         foreach ($attributes as $attributeDefinition) {
             if (!isset($attributeDefinition->name)) continue;
             try {
-                $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property);
+                $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);;
             } catch (\ValueError) {}
         }
         try {

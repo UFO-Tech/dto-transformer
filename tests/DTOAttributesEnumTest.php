@@ -9,6 +9,7 @@ use ReflectionMethod;
 use ReflectionProperty;
 use Ufo\DTO\Attributes\AttrDTO;
 use Ufo\DTO\DTOAttributesEnum;
+use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Tests\Fixtures\AttrNoParent;
@@ -28,7 +29,7 @@ class DTOAttributesEnumTest extends TestCase
         $method = new ReflectionMethod(self::class, 'getMemberDto');
         $attribute = $method->getAttributes()[0];
 
-        $result = DTOAttributesEnum::tryFromAttr($attribute, ["name" => 'ok', 'email' => 'q'], $property);
+        $result = DTOAttributesEnum::tryFromAttr($attribute, ["name" => 'ok', 'email' => 'q'], $property, DTOTransformer::class);
         $this->assertSame('ok', $result->name);
     }
 
@@ -37,10 +38,10 @@ class DTOAttributesEnumTest extends TestCase
         $property = new ReflectionProperty(ValidDTO::class, 'name');
         $attribute = $property->getAttributes()[0];
 
-        $res = DTOAttributesEnum::tryFromAttr($attribute, 'xxxx', $property);
+        $res = DTOAttributesEnum::tryFromAttr($attribute, 'xxxx', $property, DTOTransformer::class);
         $this->assertSame('xxxx', $res);
         $this->expectException(BadParamException::class);
-        DTOAttributesEnum::tryFromAttr($attribute, 'ss', $property);
+        DTOAttributesEnum::tryFromAttr($attribute, 'ss', $property, DTOTransformer::class);
     }
 
     public function testTransformDto(): void
@@ -53,7 +54,7 @@ class DTOAttributesEnumTest extends TestCase
             ['name' => 'testName1', 'email' => 'testEmail1']
         ;
 
-        $user = DTOAttributesEnum::tryFromAttr($attribute, $data, $property);
+        $user = DTOAttributesEnum::tryFromAttr($attribute, $data, $property, DTOTransformer::class);
 
         $this->assertInstanceOf(MemberDto::class, $user);
         $this->assertSame('testName1', $user->name);
@@ -71,7 +72,7 @@ class DTOAttributesEnumTest extends TestCase
             ['name' => 'testName2', 'email' => 'testEmail2'],
         ];
 
-        $result = DTOAttributesEnum::tryFromAttr($attribute, $data, $property);
+        $result = DTOAttributesEnum::tryFromAttr($attribute, $data, $property, DTOTransformer::class);
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
@@ -119,7 +120,7 @@ class DTOAttributesEnumTest extends TestCase
         $method = new ReflectionMethod(self::class, 'getCustomTransformerValidDTO');
         $attribute = $method->getAttributes()[0];
 
-        $result = DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomTransformerValidDTO(), $property);
+        $result = DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomTransformerValidDTO(), $property, DTOTransformer::class);
 
         $this->assertInstanceOf(ValidDTO::class, $result);
         $this->assertSame('LOWER_CASE', $result->name);
@@ -132,7 +133,7 @@ class DTOAttributesEnumTest extends TestCase
         $attribute = $method->getAttributes()[0];
 
         $this->expectException(NotSupportDTOException::class);
-        DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomTransformerInvalidDTO(), $property);
+        DTOAttributesEnum::tryFromAttr($attribute, $this->getCustomTransformerInvalidDTO(), $property, DTOTransformer::class);
     }
 
     public function testTryFromAttrThrowsWhenNoParentMatch(): void
@@ -143,7 +144,7 @@ class DTOAttributesEnumTest extends TestCase
 
         $this->expectException(\ValueError::class);
         $this->expectExceptionMessage('Unsupported attribute type');
-        DTOAttributesEnum::tryFromAttr($attr, 'any', $property);
+        DTOAttributesEnum::tryFromAttr($attr, 'any', $property, DTOTransformer::class);
     }
 
     public function testTransformDtoCollectionWithEmptyArray(): void

@@ -20,69 +20,92 @@ enum DTOAttributesEnum: string
     case ASSERTIONS = AttrAssertions::class;
     case DTO = AttrDTO::class;
 
-    public static function tryFromAttr(ReflectionAttribute $attributeDefinition, mixed $value, ReflectionProperty|ReflectionParameter $property): mixed
+    /**
+     * @psalm-param class-string<IDTOFromArrayTransformer> $dtoTransformerFQCN
+     */
+    public static function tryFromAttr(
+        ReflectionAttribute $attributeDefinition,
+        mixed $value,
+        ReflectionProperty|ReflectionParameter $property,
+        string $dtoTransformerFQCN
+    ): mixed
     {
         $attribute = $attributeDefinition->newInstance();
         try {
-            return self::from($attributeDefinition->name)->process($attribute, $value, $property);
+            return self::from($attributeDefinition->name)->process($attribute, $value, $property, $dtoTransformerFQCN);
         } catch (\ValueError) {
             foreach (class_parents($attribute) as $parentAttribute) {
                 try {
-                    return self::from($parentAttribute)->process($attribute, $value, $property);
+                    return self::from($parentAttribute)->process($attribute, $value, $property, $dtoTransformerFQCN);
                 } catch (\ValueError) {}
             }
             throw new \ValueError('Unsupported attribute type');
         }
     }
 
-    public function process(object $attribute, mixed $value, ReflectionProperty|ReflectionParameter $property): mixed
+    /**
+     * @psalm-param class-string<IDTOFromArrayTransformer> $dtoTransformerFQCN
+     */
+    public function process(
+        object $attribute,
+        mixed $value,
+        ReflectionProperty|ReflectionParameter $property,
+        string $dtoTransformerFQCN
+    ): mixed
     {
         return match ($this) {
             self::ASSERTIONS => $this->validate($attribute, $value, $property),
-            self::DTO => $this->resolveDTO($attribute, $value, $property),
+            self::DTO => $this->resolveDTO($attribute, $value, $dtoTransformerFQCN),
         };
     }
 
-    protected function resolveDTO(AttrDTO $attribute, mixed $value, ReflectionProperty|ReflectionParameter $property): array|object
+    /**
+     * @psalm-param class-string<IDTOFromArrayTransformer> $dtoTransformerFQCN
+     */
+    protected function resolveDTO(AttrDTO $attribute, mixed $value, string $dtoTransformerFQCN): array|object
     {
         if ($attribute->collection) {
-            return $this->transformDTOCollection($attribute, $value, $property);
+            return $this->transformDTOCollection($attribute, $value, $dtoTransformerFQCN);
         }
-        return $this->transformDto($attribute, $value, $property);
+        return $this->transformDto($attribute, $value, $dtoTransformerFQCN);
     }
 
-    protected function transformDTOCollection(AttrDTO $attribute, mixed $value, ReflectionProperty|ReflectionParameter $property): array
+    /**
+     * @psalm-param class-string<IDTOFromArrayTransformer> $dtoTransformerFQCN
+     */
+    protected function transformDTOCollection(AttrDTO $attribute, mixed $value, string $dtoTransformerFQCN): array
     {
         $result = [];
         foreach ($value as $key => $item) {
-            $result[$key] = $this->transformDto($attribute, $item, $property);
+            $result[$key] = $this->transformDto($attribute, $item, $dtoTransformerFQCN);
         }
         return $result;
     }
 
     /**
+     * @psalm-param class-string<IDTOFromArrayTransformer> $dtoTransformerFQCN
      * @throws BadParamException
      * @throws NotSupportDTOException
      */
     protected function transformDto(
         AttrDTO $attribute,
         mixed $value,
-        ReflectionProperty|ReflectionParameter $property
+        string $dtoTransformerFQCN
     ): object
     {
-         if ($dtoTransformerFQCN = $attribute->transformerFQCN) {
+         if ($customDTOTransformerFQCN = $attribute->transformerFQCN) {
              $implements = class_implements($dtoTransformerFQCN);
              if ($implements[IDTOFromArrayTransformer::class] ?? false) {
                  /**
-                  * @var IDTOFromArrayTransformer $dtoTransformerFQCN
+                  * @var IDTOFromArrayTransformer $customDTOTransformerFQCN
                   */
-                 if (!$dtoTransformerFQCN::isSupportClass($attribute->dtoFQCN)) {
+                 if (!$customDTOTransformerFQCN::isSupportClass($attribute->dtoFQCN)) {
                      throw new NotSupportDTOException($dtoTransformerFQCN . ' is not support transform for ' . $attribute->dtoFQCN);
                  }
-                 return $dtoTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys);
+                 return $customDTOTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys);
              }
          }
-        return DTOTransformer::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys);
+        return $dtoTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys);
     }
 
     protected function validate(AttrAssertions $attribute, mixed $value, ReflectionProperty|ReflectionParameter $property): mixed
