@@ -125,7 +125,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         ReflectionParameter|ReflectionProperty $ref,
         string $classFQCN
     ): mixed {
-        if (isset($data[$key])) {
+        if (array_key_exists($key, $data)) {
             return static::checkAttributes($ref, $data[$key]);
         }
 
@@ -164,7 +164,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         foreach ($attributes as $attributeDefinition) {
             if (!isset($attributeDefinition->name)) continue;
             try {
-                $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);;
+                $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);
             } catch (\ValueError) {}
         }
         try {

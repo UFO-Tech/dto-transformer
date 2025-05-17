@@ -11,7 +11,7 @@ class ServiceTransformer extends DTOTransformer
      */
     public static function fromArray(string $classFQCN, array $data, array $renameKey = []): object
     {
-        $classFQCN = $data['$classFQCN'] ?? $classFQCN;;
+        $classFQCN = $data['$classFQCN'] ?? $classFQCN;
         return static::transformFromArray($classFQCN, $data, $renameKey);
     }
 
