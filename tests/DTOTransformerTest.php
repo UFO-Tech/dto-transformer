@@ -9,6 +9,7 @@ use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsWithKeysDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 
 final class DTOTransformerTest extends TestCase
@@ -79,5 +80,30 @@ final class DTOTransformerTest extends TestCase
         $this->assertInstanceOf(UserDto::class, $dto->user);;
         $this->assertInstanceOf(UserDto::class, $dto->friends[0]);;
         $this->assertInstanceOf(UserDto::class, $dto->friends[1]);;
+    }
+
+    public function testArraysWithKeys(): void
+    {
+        $input = [
+            'user' => [
+                'id' => 1,
+                'name' => 'Alex',
+            ],
+            'friends' => [
+                'Friend1' => [
+                    'id' => 2,
+                    'name' => 'Friend1',
+                ],
+                [
+                    'id' => 3,
+                    'name' => 'Friend2',
+                ],
+            ]
+        ];
+
+       $obj = DTOTransformer::fromArray(MemberWithFriendsWithKeysDTO::class, $input);
+
+       $array = DTOTransformer::toArray($obj);
+       $this->assertSame($input, $array);;
     }
 }
