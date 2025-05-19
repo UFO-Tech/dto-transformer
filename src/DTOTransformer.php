@@ -165,7 +165,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             if (!isset($attributeDefinition->name)) continue;
             try {
                 $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);
-            } catch (\ValueError) {}
+            } catch (\Throwable) {}
         }
         try {
             if (TypeHintResolver::isRealClass($property->getType()->getName()) && !is_object($value)) {
