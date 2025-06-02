@@ -14,6 +14,7 @@ enum TypeHintResolver: string
     case STR = 'str';
     case ARR = 'arr';
     case ARRAY = 'array';
+    case COLLECTION = 'collection';
     case NULL = 'null';
     case NIL = 'nil';
     case OBJECT = 'object';
@@ -36,7 +37,7 @@ enum TypeHintResolver: string
     {
         return match (strtolower($type)) {
             self::ANY->value, self::MIXED->value => '',
-            self::ARR->value, self::ARRAY->value => self::ARRAY->value,
+            self::COLLECTION->value, self::ARR->value, self::ARRAY->value => self::ARRAY->value,
             self::BOOL->value, self::TRUE->value, self::BOOLEAN->value, self::FALSE->value => self::BOOL->value,
             self::DBL->value, self::DOUBLE->value, self::FLOAT->value => self::FLOAT->value,
             self::INTEGER->value, self::INT->value => self::INT->value,
@@ -77,7 +78,7 @@ enum TypeHintResolver: string
         };
     }
 
-    public static function phpToJsonSchema(array|string $phpType): string
+    public static function phpToJsonSchema(string $phpType): string
     {
         return match ($phpType) {
             self::MIXED->value => '',
