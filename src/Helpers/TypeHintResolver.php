@@ -4,6 +4,7 @@ namespace Ufo\DTO\Helpers;
 
 use function array_map;
 use function class_exists;
+use function enum_exists;
 use function implode;
 use function is_array;
 use function strtolower;
@@ -54,7 +55,17 @@ enum TypeHintResolver: string
 
     public static function isRealClass(string $value): bool
     {
-        return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value && class_exists($value);
+        return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value
+               && !enum_exists($value)
+               && class_exists($value)
+            ;
+    }
+
+   public static function isEnum(string $value): bool
+    {
+        return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value
+               && enum_exists($value)
+            ;
     }
 
     public static function jsonSchemaToPhp(array|string $type): string
