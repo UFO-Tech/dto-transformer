@@ -11,6 +11,7 @@ use function class_exists;
 use function enum_exists;
 use function implode;
 use function is_array;
+use function is_null;
 use function iterator_to_array;
 use function method_exists;
 use function str_contains;
@@ -121,7 +122,7 @@ enum TypeHintResolver: string
         ];
     }
 
-    public static function typeDescriptionToJsonSchema(string $typeExpression): array
+    public static function typeDescriptionToJsonSchema(string $typeExpression, array $classes = []): array
     {
         $resolver = new TypeResolver();
 
@@ -131,41 +132,47 @@ enum TypeHintResolver: string
             return [self::TYPE => self::ANY->value];
         }
 
-        return self::typeToSchema($type);
+        return self::typeToSchema($type, $classes);
     }
 
-    private static function typeToSchema(Type $type): array
+    private static function typeToSchema(Type $type, array $classes = []): array
     {
         $isObject = $type instanceof Types\Object_;
         if ($type instanceof Types\Array_) {
             if (str_contains((string)$type->getKeyType(), self::INT->value)) {
                 return [
                     self::TYPE => self::ARRAY->value,
-                    self::ITEMS => self::typeToSchema($type->getValueType())
+                    self::ITEMS => self::typeToSchema($type->getValueType(), $classes)
                 ];
             }
             $isObject = true;
         }
 
         if ($isObject) {
+
+            $fqsen = method_exists($type, 'getFqsen') ? $type->getFqsen() : null;
+            $fqcn = !is_null($fqsen) ? ($classes[ltrim($type, '\\')] ?? null) : null;
+            $fqcn = ($fqcn ? ['classFQCN' => $fqcn] : []);
             return [
-                self::TYPE => self::OBJECT->value,
-                'additionalProperties' =>
-                    method_exists($type, 'getFqsen') ?: null
-                    ?? (method_exists($type, 'getValueType') ? self::typeToSchema($type->getValueType()) : true)
+                ...[self::TYPE => self::OBJECT->value],
+                ...['additionalProperties' =>
+                        method_exists($type, 'getFqsen') ?: null
+                    ?? (method_exists($type, 'getValueType') ? self::typeToSchema($type->getValueType(), $classes) : true)
+                ],
+                ...$fqcn,
             ];
         }
 
         if ($type instanceof Types\Compound) {
             return [
-                self::ONE_OFF => array_map(fn(Type $t) => self::typeToSchema($t), iterator_to_array($type))
+                self::ONE_OFF => array_map(fn(Type $t) => self::typeToSchema($t, $classes), iterator_to_array($type))
             ];
         }
 
         if ($type instanceof Types\Nullable) {
             return [
                 self::ONE_OFF => [
-                    self::typeToSchema($type->getActualType()),
+                    self::typeToSchema($type->getActualType(), $classes),
                     self::typeToSchema(new Types\Null_()),
                 ]
             ];

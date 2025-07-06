@@ -2,8 +2,16 @@
 
 namespace Ufo\DTO\Tests;
 
+
+use phpDocumentor\Reflection\DocBlock\Tags\Return_;
+use phpDocumentor\Reflection\DocBlockFactory;
+use phpDocumentor\Reflection\Types\Array_;
+use phpDocumentor\Reflection\Types\ContextFactory;
+use phpDocumentor\Reflection\Types\Object_;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Ufo\DTO\Helpers\TypeHintResolver;
+use Ufo\DTO\Tests\Fixtures\ApiMethod;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 
 class TypeHintResolverTest extends TestCase
@@ -175,8 +183,23 @@ class TypeHintResolverTest extends TestCase
 
     public function testToJsonSchemaWithObjectType(): void
     {
-        $this->assertSame(['type' => 'object', 'additionalProperties' => true],
-            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass'));
+        $this->assertSame(
+            ['type' => 'object', 'additionalProperties' => true, 'classFQCN' => 'My\StdClass'],
+            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass', ['stdClass' => 'My\StdClass'])
+        );
+
+        $this->assertSame(
+            ['type' => 'object', 'additionalProperties' => true, 'classFQCN' => DummyDTO::class],
+            TypeHintResolver::typeDescriptionToJsonSchema('\DummyDTO', ['DummyDTO' => DummyDTO::class])
+        );
+
+        $this->assertSame(
+            [
+                'type' => 'array',
+                'items' => ['type' => 'object', 'additionalProperties' => true, 'classFQCN' => DummyDTO::class],
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema('\DummyDTO[]', ['DummyDTO' => DummyDTO::class])
+        );
 
         $this->assertSame(
             [
