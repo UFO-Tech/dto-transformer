@@ -2,11 +2,18 @@
 
 namespace Ufo\DTO\Helpers;
 
+use phpDocumentor\Reflection\Type;
+use phpDocumentor\Reflection\TypeResolver;
+use phpDocumentor\Reflection\Types;
+
 use function array_map;
 use function class_exists;
 use function enum_exists;
 use function implode;
 use function is_array;
+use function iterator_to_array;
+use function method_exists;
+use function str_contains;
 use function strtolower;
 
 enum TypeHintResolver: string
@@ -33,6 +40,8 @@ enum TypeHintResolver: string
     case DBL = 'dbl';
     case DOUBLE = 'double';
     const string TYPE = 'type';
+    const string ITEMS = 'items';
+    const string ONE_OFF = 'oneOf';
 
     public static function normalize(string $type): string
     {
@@ -71,14 +80,14 @@ enum TypeHintResolver: string
     public static function jsonSchemaToPhp(array|string $type): string
     {
         if (is_array($type)) {
-            if (!isset($type['type']) && !isset($type['oneOf'])) {
+            if (!isset($type[self::TYPE]) && !isset($type[self::ONE_OFF])) {
                 throw new \InvalidArgumentException('Invalid schema: missing "type" or "oneOf" key');
             }
-            if ($type['oneOf'] ?? false) {
-                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t['type']), $type['oneOf']);
+            if ($type[self::ONE_OFF] ?? false) {
+                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t[self::TYPE]), $type[self::ONE_OFF]);
                 $type = implode('|', $types);
             } else {
-                $type = TypeHintResolver::jsonSchemaToPhp($type['type']);
+                $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE]);
             }
         }
         return match ($type) {
@@ -94,7 +103,7 @@ enum TypeHintResolver: string
         return match ($phpType) {
             self::MIXED->value => '',
             self::FLOAT->value => self::NUMBER->value,
-            self::INT->value, => self::INTEGER->value,
+            self::INT->value => self::INTEGER->value,
             self::BOOL->value => self::BOOLEAN->value,
             default => $phpType
         };
@@ -112,4 +121,57 @@ enum TypeHintResolver: string
         ];
     }
 
+    public static function typeDescriptionToJsonSchema(string $typeExpression): array
+    {
+        $resolver = new TypeResolver();
+
+        try {
+            $type = $resolver->resolve($typeExpression);
+        } catch (\Throwable) {
+            return [self::TYPE => self::ANY->value];
+        }
+
+        return self::typeToSchema($type);
+    }
+
+    private static function typeToSchema(Type $type): array
+    {
+        $isObject = $type instanceof Types\Object_;
+        if ($type instanceof Types\Array_) {
+            if (str_contains((string)$type->getKeyType(), self::INT->value)) {
+                return [
+                    self::TYPE => self::ARRAY->value,
+                    self::ITEMS => self::typeToSchema($type->getValueType())
+                ];
+            }
+            $isObject = true;
+        }
+
+        if ($isObject) {
+            return [
+                self::TYPE => self::OBJECT->value,
+                'additionalProperties' =>
+                    method_exists($type, 'getFqsen') ?: null
+                    ?? (method_exists($type, 'getValueType') ? self::typeToSchema($type->getValueType()) : true)
+            ];
+        }
+
+        if ($type instanceof Types\Compound) {
+            return [
+                self::ONE_OFF => array_map(fn(Type $t) => self::typeToSchema($t), iterator_to_array($type))
+            ];
+        }
+
+        if ($type instanceof Types\Nullable) {
+            return [
+                self::ONE_OFF => [
+                    self::typeToSchema($type->getActualType()),
+                    self::typeToSchema(new Types\Null_()),
+                ]
+            ];
+        }
+
+        $phpType = self::normalize((string) $type);
+        return [self::TYPE => self::phpToJsonSchema($phpType)];
+    }
 }

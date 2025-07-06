@@ -3,11 +3,8 @@
 namespace Ufo\DTO\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Ufo\DTO\Attributes\AttrDTO;
 use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
-use Ufo\DTO\Tests\Fixtures\DTO\MemberDto;
-use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 
 class TypeHintResolverTest extends TestCase
 {
@@ -140,6 +137,157 @@ class TypeHintResolverTest extends TestCase
         ];
 
         $this->assertSame($expected, TypeHintResolver::mixedForJsonSchema());
+    }
+
+    public function testToJsonSchemaWithScalarTypes(): void
+    {
+        $this->assertSame(['type' => 'string'], TypeHintResolver::typeDescriptionToJsonSchema('string'));
+        $this->assertSame(['type' => 'integer'], TypeHintResolver::typeDescriptionToJsonSchema('int'));
+        $this->assertSame(['type' => 'number'], TypeHintResolver::typeDescriptionToJsonSchema('float'));
+        $this->assertSame(['type' => 'boolean'], TypeHintResolver::typeDescriptionToJsonSchema('bool'));
+        $this->assertSame(['type' => 'null'], TypeHintResolver::typeDescriptionToJsonSchema('null'));
+    }
+
+    public function testToJsonSchemaWithArrayTypes(): void
+    {
+        $this->assertSame(['type' => 'array', 'items' => ['type' => 'string']],
+            TypeHintResolver::typeDescriptionToJsonSchema('string[]'));
+        $this->assertSame(['type' => 'array', 'items' => ['type' => 'integer']],
+            TypeHintResolver::typeDescriptionToJsonSchema('int[]'));
+    }
+
+    public function testToJsonSchemaWithCompoundType(): void
+    {
+        $this->assertSame(['oneOf' => [['type' => 'string'], ['type' => 'integer']]],
+            TypeHintResolver::typeDescriptionToJsonSchema('string|int'));
+    }
+
+    public function testToJsonSchemaWithNullableType(): void
+    {
+        $this->assertSame(
+            ['oneOf' => [
+                ['type' => 'string'],
+                ['type' => 'null'],
+            ]],
+            TypeHintResolver::typeDescriptionToJsonSchema('?string')
+        );
+    }
+
+    public function testToJsonSchemaWithObjectType(): void
+    {
+        $this->assertSame(['type' => 'object', 'additionalProperties' => true],
+            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass'));
+
+        $this->assertSame(
+            [
+                'type' => 'array',
+                'items' => ['type' => 'object', 'additionalProperties' => true],
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass[]')
+        );
+
+        $this->assertSame(
+            [
+                'type' => 'array',
+                'items' => ['type' => 'object', 'additionalProperties' => true],
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<\stdClass>')
+        );
+
+        $this->assertSame(
+            [
+                'type' => 'object',
+                'additionalProperties' => [
+                    'type' => 'object',
+                    'additionalProperties' => true
+                ]
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<string,\stdClass>')
+        );
+
+        $this->assertSame(
+            [
+                'type' => 'array',
+                'items' => [
+                    'type' => 'array',
+                    'items' => ['type' => 'object', 'additionalProperties' => true],
+                ],
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass[][]')
+        );
+    }
+
+    public function testToJsonSchemaWithInvalidTypeExpression(): void
+    {
+        $this->assertSame(['type' => 'any'], TypeHintResolver::typeDescriptionToJsonSchema('!!invalidType!!'));
+    }
+
+    public function testToJsonSchemaWithUnknownTypeDefaultsToObject(): void
+    {
+        $this->assertSame(
+            [
+                'type' => 'object',
+                'additionalProperties' => true,
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema('unknownType')
+        );
+    }
+    public function testToJsonSchemaComplexTypes(): void
+    {
+        $this->assertSame(
+            ['oneOf' => [
+                ['type' => 'array', 'items' => ['type' => 'string']],
+                ['type' => 'array', 'items' => ['type' => 'integer']],
+            ]],
+            TypeHintResolver::typeDescriptionToJsonSchema('string[]|int[]')
+        );
+
+        $this->assertSame(
+            ['type' => 'array', 'items' => ['type' => 'string']],
+            TypeHintResolver::typeDescriptionToJsonSchema('string[]')
+        );
+
+        $this->assertSame(
+            ['type' => 'array', 'items' => ['type' => 'string']],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<string>')
+        );
+
+        $this->assertSame(
+            ['oneOf' => [
+                ['type' => 'null'],
+                ['type' => 'array', 'items' => ['type' => 'string']],
+                ['type' => 'array', 'items' => ['type' => 'integer']],
+            ]],
+            TypeHintResolver::typeDescriptionToJsonSchema('null|string[]|int[]')
+        );
+
+        $this->assertSame(
+            ['oneOf' => [
+                ['type' => 'array', 'items' => ['type' => 'string']],
+                ['type' => 'null'],
+            ]],
+            TypeHintResolver::typeDescriptionToJsonSchema('?string[]')
+        );
+
+        $this->assertSame(
+            ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<string,string>')
+        );
+
+        $this->assertSame(
+            ['type' => 'array', 'items' => ['type' => 'string']],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<int,string>')
+        );
+
+        $this->assertSame(
+            ['type' => 'object', 'additionalProperties' => ['type' => 'array', 'items' => ['type' => 'string']]],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<string,string[]>')
+        );
+
+        $this->assertSame(
+            ['type' => 'object', 'additionalProperties' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']]],
+            TypeHintResolver::typeDescriptionToJsonSchema('array<string,array<string,string>>')
+        );
     }
 
 }
