@@ -5,9 +5,11 @@ namespace Ufo\DTO\Helpers;
 use phpDocumentor\Reflection\Type;
 use phpDocumentor\Reflection\TypeResolver;
 use phpDocumentor\Reflection\Types;
+use phpDocumentor\Reflection\Types\ContextFactory;
 
 use function array_map;
 use function class_exists;
+use function dirname;
 use function enum_exists;
 use function implode;
 use function is_array;
@@ -180,5 +182,30 @@ enum TypeHintResolver: string
 
         $phpType = self::normalize((string) $type);
         return [self::TYPE => self::phpToJsonSchema($phpType)];
+    }
+
+    public static function getUsesNamespaces(string $classFQCN): array
+    {
+        $classes = [];
+        if (class_exists($classFQCN)) {
+            $reflection = new \ReflectionClass($classFQCN);
+            $contextFactory = new ContextFactory();
+            $context = $contextFactory->createFromReflector($reflection);
+            $classes = $context->getNamespaceAliases();
+
+            $namespace = $reflection->getNamespaceName();
+            if (!empty($namespace)) {
+                $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator(dirname($reflection->getFileName())));
+                foreach ($iterator as $file) {
+                    if ($file->isFile() && $file->getExtension() === 'php') {
+                        $classesName = $file->getBasename('.php');
+                        $classFQCN = $namespace . '\\' . $classesName;
+                        $classes[$classesName] = $classFQCN;
+                    }
+                }
+            }
+        }
+
+        return $classes;
     }
 }

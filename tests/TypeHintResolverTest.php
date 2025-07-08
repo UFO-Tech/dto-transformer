@@ -3,19 +3,33 @@
 namespace Ufo\DTO\Tests;
 
 
-use phpDocumentor\Reflection\DocBlock\Tags\Return_;
-use phpDocumentor\Reflection\DocBlockFactory;
-use phpDocumentor\Reflection\Types\Array_;
-use phpDocumentor\Reflection\Types\ContextFactory;
-use phpDocumentor\Reflection\Types\Object_;
 use PHPUnit\Framework\TestCase;
-use ReflectionClass;
 use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Tests\Fixtures\ApiMethod;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
 
 class TypeHintResolverTest extends TestCase
 {
+    public function testGetUsesNamespacesWithValidClass(): void
+    {
+        $uses = TypeHintResolver::getUsesNamespaces(MemberWithFriendsDTO::class);
+        $this->assertIsArray($uses);
+        $this->assertArrayHasKey('DummyDTO', $uses); // Example namespace alias
+    }
+
+    public function testGetUsesNamespacesWithInvalidClass(): void
+    {
+        $uses = TypeHintResolver::getUsesNamespaces('NonExistent\\ClassName');
+        $this->assertIsArray($uses);
+        $this->assertEmpty($uses);
+    }
+
+    public function testGetUsesNamespacesWithoutNamespaceAliases(): void
+    {
+        $uses = TypeHintResolver::getUsesNamespaces(\stdClass::class);
+        $this->assertIsArray($uses);
+        $this->assertEmpty($uses);
+    }
 
     public function testNormalizeBasicTypes(): void
     {
