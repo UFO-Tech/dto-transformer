@@ -180,6 +180,10 @@ enum TypeHintResolver: string
             ];
         }
 
+        if ($type instanceof Types\Mixed_) {
+            return [self::ONE_OFF => self::mixedForJsonSchema()];
+        }
+
         $phpType = self::normalize((string) $type);
         return [self::TYPE => self::phpToJsonSchema($phpType)];
     }

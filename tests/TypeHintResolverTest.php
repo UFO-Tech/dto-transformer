@@ -10,6 +10,21 @@ use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
 
 class TypeHintResolverTest extends TestCase
 {
+    public function testTypeToSchemaWithCompoundType(): void
+    {
+        $expected = [
+            'oneOf' => [
+                ['type' => 'string'],
+                ['type' => 'integer'],
+                ['type' => 'number'],
+                ['type' => 'boolean'],
+                ['type' => 'array'],
+                ['type' => 'null'],
+            ],
+        ];
+        $this->assertSame($expected, TypeHintResolver::typeDescriptionToJsonSchema('mixed'));
+    }
+
     public function testGetUsesNamespacesWithValidClass(): void
     {
         $uses = TypeHintResolver::getUsesNamespaces(MemberWithFriendsDTO::class);
