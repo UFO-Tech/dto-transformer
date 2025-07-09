@@ -12,10 +12,12 @@ use function class_exists;
 use function dirname;
 use function enum_exists;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_null;
 use function iterator_to_array;
 use function method_exists;
+use function sprintf;
 use function str_contains;
 use function strtolower;
 
@@ -99,6 +101,26 @@ enum TypeHintResolver: string
             self::BOOLEAN->value => self::BOOL->value,
             default => $type
         };
+    }
+
+    public static function checkMixedInSchema(array $schema): bool
+    {
+        if (!isset($schema[self::ONE_OFF])) {
+            return false;
+        }
+        $requiredTypes = [
+            self::STRING->value,
+            self::INTEGER->value,
+            self::NUMBER->value,
+            self::BOOLEAN->value,
+            self::ARRAY->value,
+            self::NULL->value,
+        ];
+        $schemaTypes = array_map(fn($type) => $type[self::TYPE], $schema[self::ONE_OFF]);
+        sort($requiredTypes);
+        sort($schemaTypes);
+
+        return $requiredTypes === $schemaTypes;
     }
 
     public static function phpToJsonSchema(string $phpType): string
@@ -211,5 +233,50 @@ enum TypeHintResolver: string
         }
 
         return $classes;
+    }
+
+    public static function jsonSchemaToTypeDescription(array $schema): string
+    {
+        if (isset($schema[self::ONE_OFF])) {
+
+            if (self::checkMixedInSchema($schema)) {
+                return self::MIXED->value;
+            }
+            $types = array_map(fn($type) => self::jsonSchemaToTypeDescription($type), $schema[self::ONE_OFF]);
+
+            if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
+                return '?' . current(array_filter($types, fn($type) => $type !== self::NULL->value));
+            } else {
+                return implode('|', $types);
+            }
+        }
+        if (!isset($schema[self::TYPE])) {
+            return self::MIXED->value;
+        }
+        $type = self::jsonSchemaToPhp($schema[self::TYPE]);
+
+        if ($type === self::OBJECT->value && is_array($schema['additionalProperties'])) {
+            $valueType = self::jsonSchemaToTypeDescription($schema['additionalProperties']);
+            return sprintf('array<string,%s>', $valueType);
+        }
+
+        if ($type === self::ARRAY->value && isset($schema[self::ITEMS])) {
+            $valueType = self::jsonSchemaToTypeDescription($schema[self::ITEMS]);
+            if (
+                self::tryFrom($valueType)
+                || class_exists($valueType)
+                || (!str_contains($valueType, '|')
+                    && str_ends_with($valueType, '[]'))
+            ) {
+                return sprintf("%s[]", $valueType);
+            } else {
+                return sprintf("%s<%s>", self::ARRAY->value, $valueType);
+            }
+        }
+        if ($type === self::OBJECT->value && isset($schema['classFQCN'])) {
+            return $schema['classFQCN'];
+        }
+
+        return $type;
     }
 }
