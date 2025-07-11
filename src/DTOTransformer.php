@@ -5,8 +5,10 @@ namespace Ufo\DTO;
 use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
+use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionProperty;
+use ReflectionUnionType;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Interfaces\IArrayConvertible;
 use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
@@ -18,8 +20,6 @@ use Symfony\Component\Serializer\Attribute\Ignore;
 use function array_key_exists;
 use function array_map;
 use function gettype;
-use function is_object;
-use function Symfony\Component\String\s;
 
 class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayTransformer,  IDTOFromArrayTransformer
 {
@@ -83,7 +83,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             }
             if ($hasReadonly) $instance = $reflectionClass->newInstanceArgs($constructParams);
         }
-        $instance = $instance ?? $reflectionClass->newInstanceWithoutConstructor();
+        $instance = $instance ?? static::createUninitializedInstance($reflectionClass);
 
         foreach ($reflectionClass->getProperties() as $property) {
             $keys = static::getPropertyKey($property, $renameKey);
@@ -136,14 +136,18 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
 
             $ref instanceof ReflectionProperty => (function () use ($classFQCN, $ref, $key) {
                 $refClass = (new ReflectionClass($classFQCN));
-                $instance = $refClass->newInstanceWithoutConstructor();
+                $instance = static::createUninitializedInstance($refClass);
                 try {
                     return $ref->getValue($instance);
                 } catch (\Throwable) {
                     if (!$ref->isInitialized($instance)) {
-                        foreach ($refClass->getConstructor()->getParameters() as $p) {
-                            if ($p->getName() === $key && $p->isOptional()) {
-                                return $p->getDefaultValue();
+                        $constructor = $refClass->getConstructor();
+
+                        if ($constructor !== null) {
+                            foreach ($constructor->getParameters() as $p) {
+                                if ($p->getName() === $key && $p->isOptional()) {
+                                    return $p->getDefaultValue();
+                                }
                             }
                         }
                     }
@@ -164,15 +168,127 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         foreach ($attributes as $attributeDefinition) {
             if (!isset($attributeDefinition->name)) continue;
             try {
-                $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);
-            } catch (\Throwable) {}
+                return DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);
+            } catch (\ValueError) {}
         }
-        try {
-            if (TypeHintResolver::isRealClass($property->getType()->getName()) && !is_object($value)) {
-                $value = static::transformFromArray($property->getType()->getName(), $value);
-            }
-        } catch (\Throwable) {}
+
+        if (is_array($value)) {
+            return static::resolveValueForType($property->getType(), $value, $property);
+        }
         return $value;
+    }
+
+    protected static function resolveValueForType(
+        \ReflectionType|null $type,
+        array $value,
+        ReflectionProperty|ReflectionParameter $property
+    ): mixed
+    {
+        if ($type instanceof ReflectionUnionType) {
+            $allowArray = false;
+
+            foreach ($type->getTypes() as $subType) {
+                try {
+                    return static::resolveValueForType($subType, $value, $property);
+                } catch (BadParamException) {}
+
+                if ($subType instanceof ReflectionNamedType && $subType->getName() === TypeHintResolver::ARRAY->value) {
+                    $allowArray = true;
+                }
+            }
+
+            if ($allowArray) {
+                return $value;
+            }
+        }
+
+        if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
+            return static::tryTransformToMatchingClass($type->getName(), $value);
+        }
+
+        throw new BadParamException(sprintf("Cannot assign array to property %s::\$%s of type %s",
+            $property->getDeclaringClass()->getName(),
+            $property->getName(),
+            $property->getType()
+        ));
+    }
+
+    protected static function tryTransformToMatchingClass(string $className, array $data): mixed
+    {
+        if (!TypeHintResolver::isRealClass($className)) {
+            throw new BadParamException(sprintf('Class %s does not exist or is not instantiable', $className));
+        }
+
+        if (!static::doesArrayMatchClass($className, $data)) {
+            throw new BadParamException(sprintf('Cannot assign array to %s', $className));
+        }
+
+        try {
+            return static::transformFromArray($className, $data);
+        } catch (\Throwable $e) {
+            throw new BadParamException($e->getMessage(), $e->getCode(), $e);
+        }
+    }
+
+    protected static function doesArrayMatchClass(string $className, array $data): bool
+    {
+        try {
+            $reflection = new \ReflectionClass($className);
+
+            if (!TypeHintResolver::isRealClass($className)) {
+                return false;
+            }
+
+            $constructor = $reflection->getConstructor();
+            $hasReadonly = static::checkReadonlyInClass($reflection);
+
+            if ($constructor && $constructor->isPublic()) {
+                if (!static::constructorParamsMatch($constructor, $data)) {
+                    return false;
+                }
+
+                if ($hasReadonly) {
+                    return true;
+                }
+            }
+
+            return static::propertiesMatch($reflection, $data);
+        } catch (\ReflectionException|\Throwable) {
+            return false;
+        }
+    }
+
+    protected static function constructorParamsMatch(\ReflectionMethod $constructor, array $data): bool
+    {
+        foreach ($constructor->getParameters() as $param) {
+            $keys = static::getPropertyKey($param, []);
+            if (!$keys->dataKey || $param->isOptional()) continue;
+
+            if (static::isKeyMissing($data, $keys->dataKey)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    protected static function propertiesMatch(\ReflectionClass $reflection, array $data): bool
+    {
+        $instance = static::createUninitializedInstance($reflection);
+
+        foreach ($reflection->getProperties() as $property) {
+            if ($property->isReadOnly()) continue;
+
+            $keys = static::getPropertyKey($property, []);
+            if (!$keys->dataKey) continue;
+
+            $isUninitialized = !$property->hasDefaultValue() && !$property->isInitialized($instance);
+            if ($isUninitialized && static::isKeyMissing($data, $keys->dataKey)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected static function getPropertyKey(ReflectionProperty|ReflectionParameter $property, array $renameKey): TransformKeyVO
@@ -183,5 +299,16 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             $dataKey = null;
         }
         return new TransformKeyVO($dtoKey, $dataKey);
+    }
+
+    protected static function isKeyMissing(array $data, string $key): bool
+    {
+        return !array_key_exists($key, $data);
+    }
+
+    protected static function createUninitializedInstance(string|ReflectionClass $class): object
+    {
+        $reflection = $class instanceof ReflectionClass ? $class : new ReflectionClass($class);
+        return $reflection->newInstanceWithoutConstructor();
     }
 }
