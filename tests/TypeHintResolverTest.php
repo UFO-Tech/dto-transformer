@@ -5,6 +5,7 @@ namespace Ufo\DTO\Tests;
 
 use PHPUnit\Framework\TestCase;
 use Ufo\DTO\Helpers\TypeHintResolver;
+use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
 
@@ -235,7 +236,7 @@ class TypeHintResolverTest extends TestCase
                 'type' => 'array',
                 'items' => ['type' => 'object', 'additionalProperties' => true],
             ],
-            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass[]')
+            TypeHintResolver::typeDescriptionToJsonSchema('\DummyDTO[]')
         );
 
         $this->assertSame(
@@ -243,7 +244,7 @@ class TypeHintResolverTest extends TestCase
                 'type' => 'array',
                 'items' => ['type' => 'object', 'additionalProperties' => true],
             ],
-            TypeHintResolver::typeDescriptionToJsonSchema('array<\stdClass>')
+            TypeHintResolver::typeDescriptionToJsonSchema('array<\DummyDTO>')
         );
 
         $this->assertSame(
@@ -254,7 +255,7 @@ class TypeHintResolverTest extends TestCase
                     'additionalProperties' => true
                 ]
             ],
-            TypeHintResolver::typeDescriptionToJsonSchema('array<string,\stdClass>')
+            TypeHintResolver::typeDescriptionToJsonSchema('array<string,\DummyDTO>')
         );
 
         $this->assertSame(
@@ -265,7 +266,7 @@ class TypeHintResolverTest extends TestCase
                     'items' => ['type' => 'object', 'additionalProperties' => true],
                 ],
             ],
-            TypeHintResolver::typeDescriptionToJsonSchema('\stdClass[][]')
+            TypeHintResolver::typeDescriptionToJsonSchema('\DummyDTO[][]')
         );
     }
 
@@ -339,6 +340,16 @@ class TypeHintResolverTest extends TestCase
         $this->assertSame(
             ['type' => 'object', 'additionalProperties' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']]],
             TypeHintResolver::typeDescriptionToJsonSchema('array<string,array<string,string>>')
+        );
+
+        $this->assertSame(
+            [
+                'oneOf' => [
+                    ['type' => 'object', 'additionalProperties' => true, 'classFQCN' => DummyDTO::class],
+                    ['type' => 'object', 'additionalProperties' => true, 'classFQCN' => AliasDTO::class],
+                ]
+            ],
+            TypeHintResolver::typeDescriptionToJsonSchema(DummyDTO::class . '|' . AliasDTO::class)
         );
     }
 

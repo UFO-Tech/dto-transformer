@@ -16,6 +16,7 @@ use function in_array;
 use function is_array;
 use function is_null;
 use function iterator_to_array;
+use function ltrim;
 use function method_exists;
 use function sprintf;
 use function str_contains;
@@ -175,7 +176,11 @@ enum TypeHintResolver: string
         if ($isObject) {
 
             $fqsen = method_exists($type, 'getFqsen') ? $type->getFqsen() : null;
-            $fqcn = !is_null($fqsen) ? ($classes[ltrim($type, '\\')] ?? null) : null;
+            $t = ltrim($type, '\\');
+            $fqcn = !is_null($fqsen) ? ($classes[$t] ?? null) : null;
+            if (!$fqcn && class_exists($t)) {
+                $fqcn = $t;
+            }
             $fqcn = ($fqcn ? ['classFQCN' => $fqcn] : []);
             return [
                 ...[self::TYPE => self::OBJECT->value],
