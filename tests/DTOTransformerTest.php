@@ -12,6 +12,8 @@ use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ItemDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsWithKeysDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithArrayDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithUnionTypeDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UnionWithScalarDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 
@@ -108,6 +110,40 @@ final class DTOTransformerTest extends TestCase
 
        $array = DTOTransformer::toArray($obj);
        $this->assertSame($input, $array);;
+    }
+
+    public function testObjectWithArray(): void
+    {
+        $data = [
+            'name' => 'Alex',
+            'data' => [
+                'foo',
+                'bar',
+                'baz'
+            ]
+        ];
+
+        $obj = DTOTransformer::fromArray(ObjectWithArrayDTO::class, $data);
+
+        $array = DTOTransformer::toArray($obj);
+        $this->assertSame($data, $array);
+    }
+
+    public function testObjectWithUnionType(): void
+    {
+        $data = [
+            'name' => 'Alex',
+            'data' => [
+                'foo',
+                'bar',
+                'baz'
+            ]
+        ];
+
+        $obj = DTOTransformer::fromArray(ObjectWithUnionTypeDTO::class, $data);
+
+        $array = DTOTransformer::toArray($obj);
+        $this->assertSame($data, $array);
     }
 
     public function testUnionTypedPropertyResolution(): void

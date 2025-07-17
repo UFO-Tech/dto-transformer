@@ -188,13 +188,14 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             $allowArray = false;
 
             foreach ($type->getTypes() as $subType) {
+                if ($subType instanceof ReflectionNamedType && $subType->getName() === TypeHintResolver::ARRAY->value) {
+                    $allowArray = true;
+                    continue;
+                }
+
                 try {
                     return static::resolveValueForType($subType, $value, $property);
                 } catch (BadParamException) {}
-
-                if ($subType instanceof ReflectionNamedType && $subType->getName() === TypeHintResolver::ARRAY->value) {
-                    $allowArray = true;
-                }
             }
 
             if ($allowArray) {
@@ -204,6 +205,10 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
 
         if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
             return static::tryTransformToMatchingClass($type->getName(), $value);
+        }
+
+        if ($type instanceof ReflectionNamedType && $type->getName() === TypeHintResolver::ARRAY->value) {
+            return $value;
         }
 
         throw new BadParamException(sprintf("Cannot assign array to property %s::\$%s of type %s",
