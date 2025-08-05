@@ -16,6 +16,7 @@ use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithArrayDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithUnionTypeDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UnionWithScalarDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
+use Ufo\DTO\Tests\Fixtures\DTO\WrapperDTO;
 
 final class DTOTransformerTest extends TestCase
 {
@@ -368,5 +369,52 @@ final class DTOTransformerTest extends TestCase
         ];
 
         DTOTransformer::fromArray(MemberWithFriendsWithKeysDTO::class, $input);
+    }
+
+    public function testItTransformsCollectionOfDTOsWithUnionArrayType(): void
+    {
+        $input = [
+            'items' => [
+                ['id' => 1, 'name' => 'Alpha'],
+                ['id' => 2, 'name' => 'Beta'],
+            ],
+        ];
+
+        /** @var WrapperDTO $dto */
+        $dto = DTOTransformer::fromArray(WrapperDTO::class, $input);
+
+        // Перевірка типу
+        $this->assertInstanceOf(WrapperDTO::class, $dto);
+        $this->assertIsArray($dto->items);
+        $this->assertCount(2, $dto->items);
+
+        foreach ($dto->items as $item) {
+            $this->assertInstanceOf(DummyDTO::class, $item);
+        }
+
+        $this->assertEquals(1, $dto->items[0]->id);
+        $this->assertEquals('Alpha', $dto->items[0]->name);
+        $this->assertEquals(2, $dto->items[1]->id);
+        $this->assertEquals('Beta', $dto->items[1]->name);
+    }
+
+    public function testItFailsWhenNonDTOValuesProvided(): void
+    {
+        $input = [
+            'items' => [1, 2, 3],
+        ];
+
+        $this->expectException(BadParamException::class);
+        DTOTransformer::fromArray(WrapperDTO::class, $input);
+    }
+
+    public function testItFailsWhenSingleDTOProvidedInsteadOfCollection(): void
+    {
+        $input = [
+            'items' => ['id' => 1, 'name' => 'Alpha'],
+        ];
+
+        $this->expectException(BadParamException::class);
+        DTOTransformer::fromArray(WrapperDTO::class, $input);
     }
 }

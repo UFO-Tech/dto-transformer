@@ -168,7 +168,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         foreach ($attributes as $attributeDefinition) {
             if (!isset($attributeDefinition->name)) continue;
             try {
-                return DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);
+                $value = DTOAttributesEnum::tryFromAttr($attributeDefinition, $value, $property, static::class);
             } catch (\ValueError) {}
         }
 
@@ -218,29 +218,29 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         ));
     }
 
-    protected static function tryTransformToMatchingClass(string $className, array $data): mixed
+    protected static function tryTransformToMatchingClass(string $classFQCN, array $data): mixed
     {
-        if (!TypeHintResolver::isRealClass($className)) {
-            throw new BadParamException(sprintf('Class %s does not exist or is not instantiable', $className));
+        if (!TypeHintResolver::isRealClass($classFQCN)) {
+            throw new BadParamException(sprintf('Class %s does not exist or is not instantiable', $classFQCN));
         }
 
-        if (!static::doesArrayMatchClass($className, $data)) {
-            throw new BadParamException(sprintf('Cannot assign array to %s', $className));
+        if (!static::doesArrayMatchClass($classFQCN, $data)) {
+            throw new BadParamException(sprintf('Cannot assign array to %s', $classFQCN));
         }
 
         try {
-            return static::transformFromArray($className, $data);
+            return static::transformFromArray($classFQCN, $data);
         } catch (\Throwable $e) {
             throw new BadParamException($e->getMessage(), $e->getCode(), $e);
         }
     }
 
-    protected static function doesArrayMatchClass(string $className, array $data): bool
+    protected static function doesArrayMatchClass(string $classFQCN, array $data): bool
     {
         try {
-            $reflection = new \ReflectionClass($className);
+            $reflection = new \ReflectionClass($classFQCN);
 
-            if (!TypeHintResolver::isRealClass($className)) {
+            if (!TypeHintResolver::isRealClass($classFQCN)) {
                 return false;
             }
 
