@@ -126,6 +126,9 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         string $classFQCN
     ): mixed {
         if (array_key_exists($key, $data)) {
+            if (enum_exists($enumFQCN = $ref->getType()->getName())) {
+                $data[$key] = $enumFQCN::from($data[$key]);
+            }
             return static::checkAttributes($ref, $data[$key]);
         }
 
