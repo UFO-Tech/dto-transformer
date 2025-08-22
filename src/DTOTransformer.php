@@ -2,6 +2,7 @@
 
 namespace Ufo\DTO;
 
+use BackedEnum;
 use InvalidArgumentException;
 use ReflectionClass;
 use ReflectionException;
@@ -9,6 +10,7 @@ use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionProperty;
 use ReflectionUnionType;
+use Throwable;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Interfaces\IArrayConvertible;
 use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
@@ -126,9 +128,6 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         string $classFQCN
     ): mixed {
         if (array_key_exists($key, $data)) {
-            if (enum_exists($enumFQCN = $ref->getType()->getName())) {
-                $data[$key] = $enumFQCN::from($data[$key]);
-            }
             return static::checkAttributes($ref, $data[$key]);
         }
 
@@ -178,6 +177,13 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         if (is_array($value)) {
             return static::resolveValueForType($property->getType(), $value, $property);
         }
+
+        if (is_string($value) || is_int($value)) {
+            try {
+                $value = static::checkEnum($property->getType(), $value, $property);
+            } catch (\Throwable) {}
+        }
+
         return $value;
     }
 
@@ -219,6 +225,27 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             $property->getName(),
             $property->getType()
         ));
+    }
+
+    protected static function checkEnum(
+        \ReflectionType $type,
+        int|string $value,
+        ReflectionParameter|ReflectionProperty $ref,
+    ): ?BackedEnum
+    {
+        if ($type instanceof ReflectionUnionType) {
+            foreach ($ref->getType()->getTypes() as $t) {
+                try {
+                    return static::checkEnum($t, $value, $ref);
+                } catch (Throwable) {}
+            }
+        }
+
+        if (enum_exists($enumFQCN = $ref->getType()->getName())) {
+            return $enumFQCN::from($value);
+        }
+
+        throw new BadParamException(sprintf("Cannot assign value %s to property %s::\$%s of type %s",));
     }
 
     protected static function tryTransformToMatchingClass(string $classFQCN, array $data): mixed
