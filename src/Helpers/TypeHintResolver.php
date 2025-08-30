@@ -48,6 +48,7 @@ enum TypeHintResolver: string
     const string TYPE = 'type';
     const string ITEMS = 'items';
     const string ONE_OFF = 'oneOf';
+    const string REF = '$ref';
 
     public static function normalize(string $type): string
     {
@@ -71,31 +72,37 @@ enum TypeHintResolver: string
     public static function isRealClass(string $value): bool
     {
         return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value
-               && !enum_exists($value)
-               && class_exists($value)
+            && !enum_exists($value)
+            && class_exists($value)
             ;
     }
 
-   public static function isEnum(string $value): bool
+    public static function isEnum(string $value): bool
     {
         return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value
-               && enum_exists($value)
+            && enum_exists($value)
             ;
     }
 
-    public static function jsonSchemaToPhp(array|string $type): string
+    public static function jsonSchemaToPhp(array|string $type, ?string $namespace = null): string
     {
         if (is_array($type)) {
-            if (!isset($type[self::TYPE]) && !isset($type[self::ONE_OFF])) {
+            if (!isset($type[self::TYPE]) && !isset($type[self::ONE_OFF]) && !isset($type[self::REF])) {
                 throw new \InvalidArgumentException('Invalid schema: missing "type" or "oneOf" key');
             }
             if ($type[self::ONE_OFF] ?? false) {
-                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t[self::TYPE]), $type[self::ONE_OFF]);
+                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t[self::TYPE] ?? $t[self::REF], $namespace), $type[self::ONE_OFF]);
                 $type = implode('|', $types);
             } else {
-                $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE]);
+                $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE] ?? $type[self::REF], $namespace);
             }
         }
+
+        if (str_starts_with($type,'#')) {
+            $parts = explode('/', $type);
+            $type = $namespace . '\\'. end($parts);
+        }
+
         return match ($type) {
             self::NUMBER->value => self::FLOAT->value,
             self::INTEGER->value => self::INT->value,
@@ -185,8 +192,8 @@ enum TypeHintResolver: string
             return [
                 ...[self::TYPE => self::OBJECT->value],
                 ...['additionalProperties' =>
-                        method_exists($type, 'getFqsen') ?: null
-                    ?? (method_exists($type, 'getValueType') ? self::typeToSchema($type->getValueType(), $classes) : true)
+                    method_exists($type, 'getFqsen') ?: null
+                        ?? (method_exists($type, 'getValueType') ? self::typeToSchema($type->getValueType(), $classes) : true)
                 ],
                 ...$fqcn,
             ];

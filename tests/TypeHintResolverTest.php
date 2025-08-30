@@ -454,4 +454,20 @@ class TypeHintResolverTest extends TestCase
         ]));
     }
 
+    public function testObjectJsonSchema(): void
+    {
+        $array = json_decode('{"default": null, "oneOf": [{ "$ref": "#/components/schemas/CreateInvoiceDetailDTO"},{"type": "null"}]}', true);
+
+        $result = TypeHintResolver::jsonSchemaToPhp($array);
+        $resultWithNamespace = TypeHintResolver::jsonSchemaToPhp($array, 'DTO');
+
+        $resultObject = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq']);
+        $resultObjectWithNamespace = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq'], 'DTO');
+
+        $this->assertEquals('\CreateInvoiceDetailDTO|null', $result);
+        $this->assertEquals('DTO\CreateInvoiceDetailDTO|null', $resultWithNamespace);
+        $this->assertEquals('\Qqq', $resultObject);
+        $this->assertEquals('DTO\Qqq', $resultObjectWithNamespace);
+
+    }
 }
