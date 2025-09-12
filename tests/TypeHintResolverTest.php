@@ -454,6 +454,39 @@ class TypeHintResolverTest extends TestCase
         ]));
     }
 
+    public function testJsonSchemaToPhpType(): void
+    {
+        $schema = [
+            'type'                 => 'object',
+            'additionalProperties' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+        ];
+
+        $simpleSchema = [
+            'type'                 => 'object',
+            'additionalProperties' => ['type' => 'string'],
+        ];
+
+        $onOffSchema = [
+            'oneOf' => [
+                [
+                    'type'                 => 'object',
+                    'additionalProperties' => ['type' => 'string'],
+                ],
+                [
+                    'type'                 => 'null',
+                ]
+            ]
+        ];
+
+        $resultCollection = TypeHintResolver::jsonSchemaToPhp($schema);
+        $resultArray = TypeHintResolver::jsonSchemaToPhp($simpleSchema);
+        $resultOnOff = TypeHintResolver::jsonSchemaToPhp($onOffSchema);;
+
+        $this->assertSame('array', $resultCollection);
+        $this->assertSame('array', $resultArray);
+        $this->assertSame('array|null', $resultOnOff);
+    }
+
     public function testObjectJsonSchema(): void
     {
         $array = json_decode('{"default": null, "oneOf": [{ "$ref": "#/components/schemas/CreateInvoiceDetailDTO"},{"type": "null"}]}', true);
@@ -468,6 +501,5 @@ class TypeHintResolverTest extends TestCase
         $this->assertEquals('DTO\CreateInvoiceDetailDTO|null', $resultWithNamespace);
         $this->assertEquals('\Qqq', $resultObject);
         $this->assertEquals('DTO\Qqq', $resultObjectWithNamespace);
-
     }
 }

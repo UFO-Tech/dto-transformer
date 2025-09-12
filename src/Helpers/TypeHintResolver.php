@@ -91,8 +91,10 @@ enum TypeHintResolver: string
                 throw new \InvalidArgumentException('Invalid schema: missing "type" or "oneOf" key');
             }
             if ($type[self::ONE_OFF] ?? false) {
-                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t[self::TYPE] ?? $t[self::REF], $namespace), $type[self::ONE_OFF]);
+                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t, $namespace), $type[self::ONE_OFF]);
                 $type = implode('|', $types);
+            } elseif (is_null($namespace) && ($type[self::TYPE] ?? '') === self::OBJECT->value && isset($type['additionalProperties'])) {
+                $type = self::ARRAY->value;
             } else {
                 $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE] ?? $type[self::REF], $namespace);
             }
