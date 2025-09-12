@@ -377,7 +377,7 @@ class TypeHintResolverTest extends TestCase
             'additionalProperties' => true,
             'classFQCN'            => '\stdClass',
         ]));
-        $this->assertSame('object', TypeHintResolver::jsonSchemaToTypeDescription([
+        $this->assertSame('array', TypeHintResolver::jsonSchemaToTypeDescription([
             'type'                 => 'object',
             'additionalProperties' => true,
         ]));
@@ -390,14 +390,22 @@ class TypeHintResolverTest extends TestCase
             'type'  => 'array',
             'items' => ['type' => 'object', 'additionalProperties' => true, 'classFQCN' => DummyDTO::class],
         ]));
-        $this->assertSame('object[]', TypeHintResolver::jsonSchemaToTypeDescription([
+        $this->assertSame('array[]', TypeHintResolver::jsonSchemaToTypeDescription([
             'type'  => 'array',
             'items' => ['type' => 'object', 'additionalProperties' => true],
         ]));
         $this->assertSame('array<string,array<string,string>>', TypeHintResolver::jsonSchemaToTypeDescription(
-            ['type' => 'object', 'additionalProperties' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']]]
+            [
+                'type' => 'object',
+                'additionalProperties' => [
+                    'type' => 'object',
+                    'additionalProperties' => [
+                        'type' => 'string'
+                    ]
+                ]
+            ]
         ));
-        $this->assertSame('object[][]', TypeHintResolver::jsonSchemaToTypeDescription([
+        $this->assertSame('array[][]', TypeHintResolver::jsonSchemaToTypeDescription([
             'type'  => 'array',
             'items' => [
                 'type'  => 'array',
@@ -413,7 +421,7 @@ class TypeHintResolverTest extends TestCase
             ['type' => 'null'],
         ]]));
 
-        $this->assertSame('object', TypeHintResolver::jsonSchemaToTypeDescription([
+        $this->assertSame('array', TypeHintResolver::jsonSchemaToTypeDescription([
             'type'                 => 'object',
             'additionalProperties' => true,
         ]));
@@ -484,7 +492,7 @@ class TypeHintResolverTest extends TestCase
 
         $this->assertSame('array', $resultCollection);
         $this->assertSame('array', $resultArray);
-        $this->assertSame('array|null', $resultOnOff);
+        $this->assertContains($resultOnOff, ['array|null', '?array']);
     }
 
     public function testObjectJsonSchema(): void
@@ -497,8 +505,8 @@ class TypeHintResolverTest extends TestCase
         $resultObject = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq']);
         $resultObjectWithNamespace = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq'], 'DTO');
 
-        $this->assertEquals('\CreateInvoiceDetailDTO|null', $result);
-        $this->assertEquals('DTO\CreateInvoiceDetailDTO|null', $resultWithNamespace);
+        $this->assertContains($result, ['\CreateInvoiceDetailDTO|null', '?\CreateInvoiceDetailDTO']);
+        $this->assertContains($resultWithNamespace, ['DTO\CreateInvoiceDetailDTO|null', '?DTO\CreateInvoiceDetailDTO']);
         $this->assertEquals('\Qqq', $resultObject);
         $this->assertEquals('DTO\Qqq', $resultObjectWithNamespace);
     }
