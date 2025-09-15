@@ -28,12 +28,14 @@ class EnumsHelper
                 $data[$enum->name] = $value;
             }
         }
-        
-        $rules[TypeHintResolver::TYPE] = TypeHintResolver::phpToJsonSchema($refEnum->getBackingType()->getName());
-        $rules[XUfoValuesEnum::ENUM->value] = $data;
-        $rules[XUfoValuesEnum::ENUM_NAME->value] = $refEnum->getShortName();
-        $rules[static::ENUM_KEY] = array_values($data);
 
-        return $rules;
+        return [
+            TypeHintResolver::TYPE => TypeHintResolver::phpToJsonSchema($refEnum->getBackingType()->getName()),
+            XUfoValuesEnum::ENUM->value => [
+                XUfoValuesEnum::ENUM_NAME->value => $refEnum->getShortName(),
+                XUfoValuesEnum::ENUM_VALUES->value => $data,
+            ],
+            static::ENUM_KEY => array_values($data)
+        ];
     }
 }
