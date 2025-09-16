@@ -108,7 +108,7 @@ enum TypeHintResolver: string
 
         if (str_starts_with($type,'#')) {
             $parts = explode('/', $type);
-            $type = $namespace . '\\'. end($parts);
+            $type = !empty($namespace) ? $namespace . '\\' . end($parts) : end($parts);
         }
 
         return match ($type) {
@@ -267,7 +267,7 @@ enum TypeHintResolver: string
             if (self::checkMixedInSchema($schema)) {
                 return self::MIXED->value;
             }
-            $types = array_map(fn($type) => self::jsonSchemaToTypeDescription($type), $schema[self::ONE_OFF]);
+            $types = array_map(fn($type) => self::jsonSchemaToTypeDescription($type, $namespace), $schema[self::ONE_OFF]);
 
             if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
                 return '?' . current(array_filter($types, fn($type) => $type !== self::NULL->value));
@@ -281,12 +281,12 @@ enum TypeHintResolver: string
         $type = self::jsonSchemaToPhp($schema, $namespace);
 
         if (($type === self::OBJECT->value || $type === self::ARRAY->value) && is_array($schema['additionalProperties'] ?? null)) {
-            $valueType = self::jsonSchemaToTypeDescription($schema['additionalProperties']);
+            $valueType = self::jsonSchemaToTypeDescription($schema['additionalProperties'], $namespace);
             return sprintf('array<string,%s>', $valueType);
         }
 
         if ($type === self::ARRAY->value && isset($schema[self::ITEMS])) {
-            $valueType = self::jsonSchemaToTypeDescription($schema[self::ITEMS]);
+            $valueType = self::jsonSchemaToTypeDescription($schema[self::ITEMS], $namespace);
             if (
                 self::tryFrom($valueType)
                 || class_exists($valueType)
