@@ -83,14 +83,14 @@ enum TypeHintResolver: string
             && enum_exists($value);
     }
 
-    public static function jsonSchemaToPhp(array|string $type, ?string $namespace = null): string
+    public static function jsonSchemaToPhp(array|string $type, array $namespaces = []): string
     {
         if (is_array($type)) {
             if (!isset($type[self::TYPE]) && !isset($type[self::ONE_OFF]) && !isset($type[self::REF])) {
                 throw new \InvalidArgumentException('Invalid schema: missing "type" or "oneOf" key');
             }
             if ($type[self::ONE_OFF] ?? false) {
-                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t, $namespace), $type[self::ONE_OFF]);
+                $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t, $namespaces), $type[self::ONE_OFF]);
 
                 if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
                     $type = '?' . current(array_filter($types, fn($t) => $t !== self::NULL->value));
@@ -102,15 +102,15 @@ enum TypeHintResolver: string
                 $type = self::ARRAY->value;
             } elseif (($type[EnumsHelper::ENUM_KEY] ?? false) && ($type[XUfoValuesEnum::ENUM->value] ?? false)) {
                 $enumName = $type[XUfoValuesEnum::ENUM->value][XUfoValuesEnum::ENUM_NAME->value];
-                $type = self::typeWithNamespace($enumName, $namespace);
+                $type = self::typeWithNamespace($enumName, $namespaces, 'enum');
             } else {
-                $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE] ?? $type[self::REF], $namespace);
+                $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE] ?? $type[self::REF], $namespaces);
             }
         }
 
         if (str_starts_with($type,'#')) {
             $parts = explode('/', $type);
-            $type = self::typeWithNamespace(end($parts), $namespace);;
+            $type = self::typeWithNamespace(end($parts), $namespaces, 'dto');
         }
 
         return match ($type) {
@@ -263,14 +263,14 @@ enum TypeHintResolver: string
         return $classes;
     }
 
-    public static function jsonSchemaToTypeDescription(array $schema, ?string $namespace = null): string
+    public static function jsonSchemaToTypeDescription(array $schema, array $namespaces = []): string
     {
         if (isset($schema[self::ONE_OFF])) {
 
             if (self::checkMixedInSchema($schema)) {
                 return self::MIXED->value;
             }
-            $types = array_map(fn($type) => self::jsonSchemaToTypeDescription($type, $namespace), $schema[self::ONE_OFF]);
+            $types = array_map(fn($type) => self::jsonSchemaToTypeDescription($type, $namespaces), $schema[self::ONE_OFF]);
 
             if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
                 return '?' . current(array_filter($types, fn($type) => $type !== self::NULL->value));
@@ -281,15 +281,15 @@ enum TypeHintResolver: string
         if (!isset($schema[self::TYPE]) && !isset($schema[self::REF])) {
             return self::MIXED->value;
         }
-        $type = self::jsonSchemaToPhp($schema, $namespace);
+        $type = self::jsonSchemaToPhp($schema, $namespaces);
 
         if (($type === self::OBJECT->value || $type === self::ARRAY->value) && is_array($schema['additionalProperties'] ?? null)) {
-            $valueType = self::jsonSchemaToTypeDescription($schema['additionalProperties'], $namespace);
+            $valueType = self::jsonSchemaToTypeDescription($schema['additionalProperties'], $namespaces);
             return sprintf('array<string,%s>', $valueType);
         }
 
         if ($type === self::ARRAY->value && isset($schema[self::ITEMS])) {
-            $valueType = self::jsonSchemaToTypeDescription($schema[self::ITEMS], $namespace);
+            $valueType = self::jsonSchemaToTypeDescription($schema[self::ITEMS], $namespaces);
             if (
                 self::tryFrom($valueType)
                 || class_exists($valueType)
@@ -308,8 +308,9 @@ enum TypeHintResolver: string
         return $type;
     }
 
-    protected static function typeWithNamespace(string $type, ?string $namespace = null): string
+    protected static function typeWithNamespace(string $type, array $namespaces = [], ?string $defaultKey = null): string
     {
+        $namespace = $namespaces[$type] ?? $namespaces[$defaultKey] ?? null;
         return !empty($namespace) ? $namespace . '\\' . $type : $type;
     }
 

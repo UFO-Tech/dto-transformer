@@ -505,10 +505,10 @@ class TypeHintResolverTest extends TestCase
         $array = json_decode('{"default": null, "oneOf": [{ "$ref": "#/components/schemas/CreateInvoiceDetailDTO"},{"type": "null"}]}', true);
 
         $result = TypeHintResolver::jsonSchemaToPhp($array);
-        $resultWithNamespace = TypeHintResolver::jsonSchemaToPhp($array, 'DTO');
+        $resultWithNamespace = TypeHintResolver::jsonSchemaToPhp($array, ['CreateInvoiceDetailDTO' => 'DTO']);
 
         $resultObject = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq']);
-        $resultObjectWithNamespace = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq'], 'DTO');
+        $resultObjectWithNamespace = TypeHintResolver::jsonSchemaToPhp(['$ref' => '#/Qqq'], ['Qqq' => 'DTO']);
 
         $this->assertContains($result, ['CreateInvoiceDetailDTO|null', '?CreateInvoiceDetailDTO']);
         $this->assertContains($resultWithNamespace, ['DTO\CreateInvoiceDetailDTO|null', '?DTO\CreateInvoiceDetailDTO']);
@@ -534,9 +534,9 @@ class TypeHintResolverTest extends TestCase
         $int = json_decode('{"type":"integer","x-ufo-enum":{"name":"IntEnum","values":{"A":1,"B":2,"C":3}},"enum":[1,2,3]}', true);
 
         $typeString = TypeHintResolver::jsonSchemaToPhp($string);
-        $typeStringWithNamespace = TypeHintResolver::jsonSchemaToPhp($string, 'DDD');
+        $typeStringWithNamespace = TypeHintResolver::jsonSchemaToPhp($string, ['StringEnum' => 'DDD']);
         $typeDescString = TypeHintResolver::jsonSchemaToTypeDescription($string);
-        $typeDescStringWithNamespace = TypeHintResolver::jsonSchemaToTypeDescription($string, 'DDD');
+        $typeDescStringWithNamespace = TypeHintResolver::jsonSchemaToTypeDescription($string, ['StringEnum' => 'DDD']);
 
         $this->assertEquals('StringEnum', $typeString);
         $this->assertEquals('StringEnum', $typeDescString);
@@ -544,12 +544,16 @@ class TypeHintResolverTest extends TestCase
         $this->assertEquals('DDD\StringEnum', $typeDescStringWithNamespace);
 
         $typeInt = TypeHintResolver::jsonSchemaToPhp($int);
-        $typeIntWithNamespace = TypeHintResolver::jsonSchemaToPhp($int, 'DDD');
+        $typeIntWithNamespace = TypeHintResolver::jsonSchemaToPhp($int, ['IntEnum' => 'DDD']);
         $typeDescInt = TypeHintResolver::jsonSchemaToTypeDescription($int);
-        $typeDescIntWithNamespace = TypeHintResolver::jsonSchemaToTypeDescription($int, 'DDD');
+        $typeDescIntWithNamespace = TypeHintResolver::jsonSchemaToTypeDescription($int, ['IntEnum' => 'DDD']);
         $this->assertEquals('IntEnum', $typeInt);
         $this->assertEquals('IntEnum', $typeDescInt);
         $this->assertEquals('DDD\IntEnum', $typeIntWithNamespace);
         $this->assertEquals('DDD\IntEnum', $typeDescIntWithNamespace);
+
+        $typeDescStringWithNamespace = TypeHintResolver::jsonSchemaToTypeDescription($string, ['enum' => 'DefaultNS']);
+        $this->assertEquals('DefaultNS\StringEnum', $typeDescStringWithNamespace);
+
     }
 }
