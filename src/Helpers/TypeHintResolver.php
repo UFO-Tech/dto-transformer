@@ -10,6 +10,7 @@ use phpDocumentor\Reflection\Types\ContextFactory;
 use function array_map;
 use function class_exists;
 use function dirname;
+use function end;
 use function enum_exists;
 use function implode;
 use function in_array;
@@ -73,15 +74,13 @@ enum TypeHintResolver: string
     {
         return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value
             && !enum_exists($value)
-            && class_exists($value)
-            ;
+            && class_exists($value);
     }
 
     public static function isEnum(string $value): bool
     {
         return TypeHintResolver::normalize($value) === TypeHintResolver::OBJECT->value
-            && enum_exists($value)
-            ;
+            && enum_exists($value);
     }
 
     public static function jsonSchemaToPhp(array|string $type, ?string $namespace = null): string
@@ -101,6 +100,9 @@ enum TypeHintResolver: string
 
             } elseif (!isset($type['classFQCN']) && ($type[self::TYPE] ?? '') === self::OBJECT->value && isset($type['additionalProperties'])) {
                 $type = self::ARRAY->value;
+            } elseif (($type[EnumsHelper::ENUM_KEY] ?? false) && ($type[XUfoValuesEnum::ENUM->value] ?? false)) {
+                $enumName = $type[XUfoValuesEnum::ENUM->value][XUfoValuesEnum::ENUM_NAME->value];
+                $type = self::typeWithNamespace($enumName, $namespace);
             } else {
                 $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE] ?? $type[self::REF], $namespace);
             }
@@ -108,7 +110,7 @@ enum TypeHintResolver: string
 
         if (str_starts_with($type,'#')) {
             $parts = explode('/', $type);
-            $type = !empty($namespace) ? $namespace . '\\' . end($parts) : end($parts);
+            $type = self::typeWithNamespace(end($parts), $namespace);;
         }
 
         return match ($type) {
@@ -118,6 +120,7 @@ enum TypeHintResolver: string
             default => $type
         };
     }
+
 
     public static function checkMixedInSchema(array $schema): bool
     {
@@ -304,4 +307,10 @@ enum TypeHintResolver: string
 
         return $type;
     }
+
+    protected static function typeWithNamespace(string $type, ?string $namespace = null): string
+    {
+        return !empty($namespace) ? $namespace . '\\' . $type : $type;
+    }
+
 }
