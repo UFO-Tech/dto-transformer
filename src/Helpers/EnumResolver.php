@@ -11,7 +11,7 @@ use function call_user_func;
 enum EnumResolver:string
 {
     case STRING = TypeHintResolver::STRING->value;
-    case INT = TypeHintResolver::INT->value;
+    case INT = TypeHintResolver::INTEGER->value;
 
     const string CORE = 'x-ufo';
     const string ENUM = self::CORE . '-enum';
