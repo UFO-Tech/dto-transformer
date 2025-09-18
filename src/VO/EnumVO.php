@@ -38,11 +38,19 @@ readonly class EnumVO
     {
         $data = $schema[EnumResolver::ENUM] ?? [];
         $type = $schema[TypeHintResolver::TYPE] ?? TypeHintResolver::STRING->value;
-
+        $values = $data[EnumResolver::METHOD_VALUES]
+                  ?? $schema[EnumResolver::ENUM_KEY]
+                  ?? throw new \InvalidArgumentException('Enum schema missing required fields');
+        if (!is_array($values)) {
+            throw new \InvalidArgumentException('Enum values must be an list of strings or integers');
+        }
         return new static(
-            $data[EnumResolver::ENUM_NAME] ?? ucfirst($paramName) . 'Enum' ?? throw new \InvalidArgumentException('Enum name is required'),
+            $data[EnumResolver::ENUM_NAME]
+                ?? ($paramName ? ucfirst($paramName) . 'Enum' : null)
+                ?? throw new \InvalidArgumentException('Enum name is required'),
+
             EnumResolver::tryFrom($type) ?? EnumResolver::STRING,
-            $data[EnumResolver::METHOD_VALUES] ?? $schema[EnumResolver::ENUM_KEY] ?? ['KEY' => 'value'],
+            $values
         );
     }
 }

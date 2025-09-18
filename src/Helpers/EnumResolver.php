@@ -58,6 +58,23 @@ enum EnumResolver:string
         return $type[EnumResolver::ENUM][EnumResolver::ENUM_NAME] ?? null;
     }
 
+    public static function schemaHasEnum(array $schema): bool
+    {
+        foreach ($schema[TypeHintResolver::ONE_OFF] ?? [] as $type) {
+            if (!empty($type[self::ENUM]) || !empty($type[self::ENUM_KEY])) {
+                return true;
+            }
+        }
+
+        return (bool)(
+            $schema[TypeHintResolver::ITEMS][self::ENUM]
+            ?? $schema[TypeHintResolver::ITEMS][self::ENUM_KEY]
+            ?? $schema[self::ENUM]
+            ?? $schema[self::ENUM_KEY]
+            ?? false
+        );
+    }
+
     public static function enumDataFromSchema(array $schema, ?string $paramName = null): EnumVO
     {
         if ($schema[TypeHintResolver::ONE_OFF] ?? false) {
