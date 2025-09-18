@@ -6,6 +6,7 @@ use phpDocumentor\Reflection\Type;
 use phpDocumentor\Reflection\TypeResolver;
 use phpDocumentor\Reflection\Types;
 use phpDocumentor\Reflection\Types\ContextFactory;
+use ReflectionException;
 
 use function array_map;
 use function class_exists;
@@ -100,8 +101,7 @@ enum TypeHintResolver: string
 
             } elseif (!isset($type['classFQCN']) && ($type[self::TYPE] ?? '') === self::OBJECT->value && isset($type['additionalProperties'])) {
                 $type = self::ARRAY->value;
-            } elseif (($type[EnumsHelper::ENUM_KEY] ?? false) && ($type[XUfoValuesEnum::ENUM->value] ?? false)) {
-                $enumName = $type[XUfoValuesEnum::ENUM->value][XUfoValuesEnum::ENUM_NAME->value];
+            } elseif ($enumName = EnumResolver::findEnumNameInJsonSchema($type)) {
                 $type = self::typeWithNamespace($enumName, $namespaces, 'enum');
             } else {
                 $type = TypeHintResolver::jsonSchemaToPhp($type[self::TYPE] ?? $type[self::REF], $namespaces);
@@ -178,6 +178,9 @@ enum TypeHintResolver: string
         return self::typeToSchema($type, $classes);
     }
 
+    /**
+     * @throws ReflectionException
+     */
     private static function typeToSchema(Type $type, array $classes = []): array
     {
         $isObject = $type instanceof Types\Object_;
@@ -202,7 +205,7 @@ enum TypeHintResolver: string
 
 
             if (enum_exists($fqcnS = $fqcn['classFQCN'] ?? '')) {
-                return EnumsHelper::generateEnumSchema($fqcnS);
+                return EnumResolver::generateEnumSchema($fqcnS);
             }
 
             return [
