@@ -49,7 +49,7 @@ readonly class EnumVO
                 ?? ($paramName ? ucfirst($paramName) . 'Enum' : null)
                 ?? throw new \InvalidArgumentException('Enum name is required'),
 
-            EnumResolver::tryFrom($type) ?? EnumResolver::STRING,
+            EnumResolver::tryFrom(TypeHintResolver::jsonSchemaToPhp($type)) ?? EnumResolver::STRING,
             $values
         );
     }
