@@ -60,17 +60,15 @@ enum EnumResolver:string
 
     public static function enumDataFromSchema(array $schema, ?string $paramName = null): EnumVO
     {
-        if ($schema[TypeHintResolver::ONE_OFF]) {
+        if ($schema[TypeHintResolver::ONE_OFF] ?? false) {
             foreach ($schema[TypeHintResolver::ONE_OFF] as $type) {
                 if ($type[EnumResolver::ENUM] || $type[EnumResolver::ENUM_KEY]) {
                     return self::enumDataFromSchema($type, $paramName);
                 }
             }
-        } elseif ($schema[TypeHintResolver::ITEMS][EnumResolver::ENUM] || $schema[TypeHintResolver::ITEMS][EnumResolver::ENUM_KEY]) {
+        } elseif (($schema[TypeHintResolver::ITEMS][EnumResolver::ENUM] ?? false) || ($schema[TypeHintResolver::ITEMS][EnumResolver::ENUM_KEY] ?? false)) {
             return self::enumDataFromSchema($schema[TypeHintResolver::ITEMS], $paramName);
         }
-
         return EnumVO::fromSchema($schema, $paramName);
-
     }
 }
