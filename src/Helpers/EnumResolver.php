@@ -62,7 +62,7 @@ enum EnumResolver:string
     {
         if ($schema[TypeHintResolver::ONE_OFF] ?? false) {
             foreach ($schema[TypeHintResolver::ONE_OFF] as $type) {
-                if ($type[EnumResolver::ENUM] || $type[EnumResolver::ENUM_KEY]) {
+                if (($type[EnumResolver::ENUM] ?? false) || ($type[EnumResolver::ENUM_KEY] ?? false)) {
                     return self::enumDataFromSchema($type, $paramName);
                 }
             }
