@@ -152,4 +152,17 @@ enum EnumResolver:string
         }
         return false;
     }
+
+    protected static function getEnumFQCN(string|array $type): ?string
+    {
+        if (is_array($type)) {
+            foreach ($type as $value) {
+                if ($res = self::getEnumFQCN($value)) {
+                    return $res;
+                }
+            }
+        }
+
+        return (is_string($type) && T::isEnum($type)) ? $type : null;
+    }
 }
