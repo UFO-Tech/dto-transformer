@@ -60,13 +60,13 @@ enum EnumResolver:string
 
     public static function schemaHasEnum(array $schema): bool
     {
+        $hasEnum = false;
         foreach ($schema[TypeHintResolver::ONE_OFF] ?? [] as $type) {
-            if (!empty($type[self::ENUM]) || !empty($type[self::ENUM_KEY])) {
-                return true;
-            }
+            $hasEnum = self::schemaHasEnum($type);
+            if ($hasEnum) break;
         }
 
-        return (bool)(
+        return $hasEnum || (bool)(
             $schema[TypeHintResolver::ITEMS][self::ENUM]
             ?? $schema[TypeHintResolver::ITEMS][self::ENUM_KEY]
             ?? $schema[self::ENUM]
@@ -79,7 +79,10 @@ enum EnumResolver:string
     {
         if ($schema[TypeHintResolver::ONE_OFF] ?? false) {
             foreach ($schema[TypeHintResolver::ONE_OFF] as $type) {
-                if (($type[EnumResolver::ENUM] ?? false) || ($type[EnumResolver::ENUM_KEY] ?? false)) {
+                if (($type[EnumResolver::ENUM] ?? false) 
+                    || ($type[EnumResolver::ENUM_KEY] ?? false) 
+                    || ($type[TypeHintResolver::ITEMS] ?? false)
+                ) {
                     return self::enumDataFromSchema($type, $paramName);
                 }
             }
