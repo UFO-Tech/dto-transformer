@@ -317,4 +317,22 @@ enum TypeHintResolver: string
         return !empty($namespace) ? $namespace . '\\' . $type : $type;
     }
 
+    /**
+     * @param array $schema
+     * @param callable(array):array $call
+     * @return array
+     */
+    public static function applyToSchema(array $schema, callable $call): array
+    {
+        if ($schema[self::ONE_OFF] ?? false) {
+            foreach ($schema[self::ONE_OFF] as $i => $desc) {
+                $schema[self::ONE_OFF][$i] = self::applyToSchema($desc, $call);
+            }
+        } elseif ($schema[self::ITEMS] ?? false) {
+            $schema[self::ITEMS] = self::applyToSchema($schema[self::ITEMS], $call);
+        }
+
+        return $call($schema);
+    }
+
 }
