@@ -153,7 +153,7 @@ enum EnumResolver:string
         return false;
     }
 
-    protected static function getEnumFQCN(string|array $type): ?string
+    public static function getEnumFQCN(string|array $type): ?string
     {
         if (is_array($type)) {
             foreach ($type as $value) {
