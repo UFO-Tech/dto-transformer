@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ufo\DTO\Tests;
 
 use PHPUnit\Framework\TestCase;
+use Ufo\DTO\BaseDTOFromArrayTransformer;
 use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
@@ -30,7 +31,7 @@ final class DTOTransformerTest extends TestCase
         $this->assertSame(1, $dto->id);
         $this->assertSame('Test', $dto->name);
 
-        $output = DTOTransformer::toArray($dto);
+        $output = DTOTransformer::toArray($dto, asSmartArray: false);
         $this->assertSame($input, $output);
     }
 
@@ -45,7 +46,7 @@ final class DTOTransformerTest extends TestCase
         $this->assertSame(99, $dto->id);
         $this->assertSame('AliasTest', $dto->name);
 
-        $output = DTOTransformer::toArray($dto, $rename);
+        $output = DTOTransformer::toArray($dto, $rename, asSmartArray: false);
         $this->assertSame($input, $output);
     }
 
@@ -109,8 +110,8 @@ final class DTOTransformerTest extends TestCase
 
        $obj = DTOTransformer::fromArray(MemberWithFriendsWithKeysDTO::class, $input);
 
-       $array = DTOTransformer::toArray($obj);
-       $this->assertSame($input, $array);;
+       $array = DTOTransformer::toArray($obj, asSmartArray: false);
+       $this->assertSame($input, $array);
     }
 
     public function testObjectWithArray(): void
@@ -126,7 +127,7 @@ final class DTOTransformerTest extends TestCase
 
         $obj = DTOTransformer::fromArray(ObjectWithArrayDTO::class, $data);
 
-        $array = DTOTransformer::toArray($obj);
+        $array = DTOTransformer::toArray($obj, asSmartArray: false);
         $this->assertSame($data, $array);
     }
 
@@ -143,7 +144,7 @@ final class DTOTransformerTest extends TestCase
 
         $obj = DTOTransformer::fromArray(ObjectWithUnionTypeDTO::class, $data);
 
-        $array = DTOTransformer::toArray($obj);
+        $array = DTOTransformer::toArray($obj, asSmartArray: false);
         $this->assertSame($data, $array);
     }
 

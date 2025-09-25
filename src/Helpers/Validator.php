@@ -16,9 +16,7 @@ class Validator
         protected ValidatorInterface $validator,
         protected mixed $data,
         protected ConstraintViolationListInterface $errors
-    )
-    {
-    }
+    ) {}
 
     public static function validate(mixed $value, null|Constraint|array $constraints = null, null|string|GroupSequence|array $groups = null): static
     {

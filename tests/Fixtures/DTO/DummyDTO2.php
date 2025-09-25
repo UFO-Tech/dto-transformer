@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Tests\Fixtures\DTO;
 
-class ItemDTO
+final class DummyDTO2
 {
     public function __construct(
-        public UserDto|DummyDTO|DummyDTO2 $friend
+        public readonly int $id,
+        public string $name
     ) {}
 }

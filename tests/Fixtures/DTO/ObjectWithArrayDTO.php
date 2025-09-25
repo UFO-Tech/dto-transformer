@@ -8,6 +8,9 @@ class ObjectWithArrayDTO
 {
     public function __construct(
         public string $name,
+        /**
+         * @var array<UserDto>
+         */
         public array $data
     ) {}
 }
