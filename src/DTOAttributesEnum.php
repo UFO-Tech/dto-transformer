@@ -5,6 +5,7 @@ namespace Ufo\DTO;
 use ReflectionAttribute;
 use ReflectionParameter;
 use ReflectionProperty;
+use Throwable;
 use Ufo\DTO\Attributes\AttrDTO;
 use Ufo\DTO\Attributes\AttrAssertions;
 use Ufo\DTO\Exceptions\BadParamException;
@@ -64,7 +65,7 @@ enum DTOAttributesEnum: string
      */
     protected function resolveDTO(AttrDTO $attribute, mixed $value, string $dtoTransformerFQCN): array|object
     {
-        if ($attribute->collection) {
+        if ($attribute->isCollection()) {
             return $this->transformDTOCollection($attribute, $value, $dtoTransformerFQCN);
         }
         return $this->transformDto($attribute, $value, $dtoTransformerFQCN);
@@ -93,19 +94,23 @@ enum DTOAttributesEnum: string
         string $dtoTransformerFQCN
     ): object
     {
-         if ($customDTOTransformerFQCN = $attribute->transformerFQCN) {
-             $implements = class_implements($dtoTransformerFQCN);
-             if ($implements[IDTOFromArrayTransformer::class] ?? false) {
-                 /**
-                  * @var IDTOFromArrayTransformer $customDTOTransformerFQCN
-                  */
-                 if (!$customDTOTransformerFQCN::isSupportClass($attribute->dtoFQCN)) {
-                     throw new NotSupportDTOException($dtoTransformerFQCN . ' is not support transform for ' . $attribute->dtoFQCN);
-                 }
-                 return $customDTOTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys);
-             }
-         }
-        return $dtoTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys);
+        if ($attribute->isEnum()) {
+            return DTOTransformer::transformEnum($attribute->dtoFQCN, $value);
+        }
+
+        if ($customDTOTransformerFQCN = $attribute->transformerFQCN()) {
+            $implements = class_implements($dtoTransformerFQCN);
+            if ($implements[IDTOFromArrayTransformer::class] ?? false) {
+                /**
+                 * @var IDTOFromArrayTransformer $customDTOTransformerFQCN
+                 */
+                if (!$customDTOTransformerFQCN::isSupportClass($attribute->dtoFQCN)) {
+                    throw new NotSupportDTOException($dtoTransformerFQCN . ' is not support transform for ' . $attribute->dtoFQCN);
+                }
+                return $customDTOTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys());
+            }
+        }
+        return $dtoTransformerFQCN::fromArray($attribute->dtoFQCN, $value, $attribute->renameKeys(), $attribute->namespaces());
     }
 
     protected function validate(AttrAssertions $attribute, mixed $value, ReflectionProperty|ReflectionParameter $property): mixed

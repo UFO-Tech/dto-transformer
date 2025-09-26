@@ -62,18 +62,18 @@ enum EnumResolver:string
     public static function schemaHasEnum(array $schema): bool
     {
         $hasEnum = false;
-        foreach ($schema[T::ONE_OFF] ?? [] as $type) {
-            $hasEnum = self::schemaHasEnum($type);
-            if ($hasEnum) break;
-        }
 
-        return $hasEnum || (bool)(
-            $schema[T::ITEMS][self::ENUM]
-            ?? $schema[T::ITEMS][self::ENUM_KEY]
-            ?? $schema[self::ENUM]
-            ?? $schema[self::ENUM_KEY]
-            ?? false
-        );
+        T::filterSchema($schema, function(array $schemaObj) use (&$hasEnum) {
+            if ($hasEnum || (bool)(
+                    $schemaObj[T::ITEMS][self::ENUM]
+                    ?? $schemaObj[T::ITEMS][self::ENUM_KEY]
+                    ?? $schemaObj[self::ENUM]
+                    ?? $schemaObj[self::ENUM_KEY]
+                    ?? false
+                )) $hasEnum = true;
+        });
+
+        return $hasEnum;
     }
 
     public static function enumDataFromSchema(array $schema, ?string $paramName = null): EnumVO
@@ -96,61 +96,21 @@ enum EnumResolver:string
     public static function applyEnumFqcnToJsonSchema(
         string $enumFQCN,
         array $jsonSchema,
-        string|array $paramType,
         string $methodGetValues = self::METHOD_VALUES,
         string $methodTryFrom = self::METHOD_TRY_FROM_VALUE,
     ): array
     {
         $enumSchema = self::generateEnumSchema($enumFQCN, $methodGetValues, $methodTryFrom);
-        return self::applyEnumSchemaToJsonSchema($enumSchema, $jsonSchema, $paramType);
-    }
-
-    public static function applyEnumSchemaToJsonSchema(
-        array $enumSchema,
-        array $jsonSchema,
-        string|array $paramType
-    ): array
-    {
-        $enumType = $enumSchema[T::TYPE] ?? null;
-        $enumVals = $enumSchema[EnumResolver::ENUM_KEY] ?? null;
-
-        if ($paramType === T::ARRAY->value || (($jsonSchema[T::TYPE] ?? null) === T::ARRAY->value)) {
-            $items = $jsonSchema[T::ITEMS] ?? [];
-
-            if (!isset($items[T::ONE_OFF]) || !self::injectEnumIntoOneOf($items[T::ONE_OFF], $enumType, $enumVals)) {
-                $items = array_replace($items, $enumSchema);
+        return T::applyToSchema($jsonSchema, function(array $schema) use ($enumSchema) {
+            if (($schema[T::TYPE] ?? '') === ($enumSchema[T::TYPE] ?? null)) {
+                $schema = [
+                    ...$schema,
+                    ...$enumSchema,
+                ];
             }
 
-            $jsonSchema[T::TYPE]  = T::ARRAY->value;
-            $jsonSchema[T::ITEMS] = $items;
-            return $jsonSchema;
-        }
-
-        if (
-            (isset($jsonSchema[T::ONE_OFF]) || is_array($paramType))
-            && (isset($jsonSchema[T::ONE_OFF]) && self::injectEnumIntoOneOf(
-                    $jsonSchema[T::ONE_OFF],
-                    $enumType,
-                    $enumVals
-                ))
-        ) {
-            return $jsonSchema;
-        }
-
-        return array_replace($jsonSchema, $enumSchema);
-    }
-
-    protected static function injectEnumIntoOneOf(array &$oneOf, ?string $baseType, ?array $enumValues): bool
-    {
-        if (!$baseType || !$enumValues) return false;
-
-        foreach ($oneOf as &$schema) {
-            if (($schema[T::TYPE] ?? null) === $baseType) {
-                $schema[EnumResolver::ENUM_KEY] = $enumValues;
-                return true;
-            }
-        }
-        return false;
+            return $schema;
+        });
     }
 
     public static function getEnumFQCN(string|array $type): ?string

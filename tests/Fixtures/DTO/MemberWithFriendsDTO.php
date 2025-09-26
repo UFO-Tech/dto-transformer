@@ -8,7 +8,10 @@ class MemberWithFriendsDTO
 {
     public function __construct(
         public UserDto $user,
-        #[AttrDTO(UserDto::class, collection: true, renameKeys: ['currentTime' => null])]
+        #[AttrDTO(UserDto::class, context: [
+            AttrDTO::C_COLLECTION => true,
+            AttrDTO::C_RENAME_KEYS => ['currentTime' => null],
+        ])]
         public array $friends
     ) {}
 }

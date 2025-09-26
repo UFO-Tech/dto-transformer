@@ -6,8 +6,9 @@ namespace Ufo\DTO;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
+use Ufo\DTO\Interfaces\IDTOFromSmartArrayTransformer;
 
-abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer
+abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, IDTOFromSmartArrayTransformer
 {
     const string DTO_CLASSNAME = '$className';
 

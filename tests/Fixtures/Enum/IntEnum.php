@@ -19,4 +19,9 @@ enum IntEnum: int
     {
         return self::tryFrom(4);
     }
+
+    public static function tryFromValue2(string $value): ?self
+    {
+        return null;
+    }
 }

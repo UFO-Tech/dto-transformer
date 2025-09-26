@@ -8,7 +8,9 @@ class MemberWithFriendsWithKeysDTO
 {
     public function __construct(
         public DummyDTO $user,
-        #[AttrDTO(DummyDTO::class, collection: true)]
+        #[AttrDTO(DummyDTO::class, context: [
+            AttrDTO::C_COLLECTION => true
+        ])]
         public array $friends
     ) {}
 }

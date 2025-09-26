@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Ufo\DTO\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Ufo\DTO\BaseDTOFromArrayTransformer;
 use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
@@ -18,9 +17,54 @@ use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithUnionTypeDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UnionWithScalarDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 use Ufo\DTO\Tests\Fixtures\DTO\WrapperDTO;
+use Ufo\DTO\Tests\Fixtures\Enum\TestBackedEnum;
+use Ufo\DTO\Tests\Fixtures\Enum\TestNonBackedEnum;
 
 final class DTOTransformerTest extends TestCase
 {
+    public function testTransformEnumWithValidBackedEnum(): void
+    {
+        $result = DTOTransformer::transformEnum(TestBackedEnum::class, 1);
+        $this->assertSame(TestBackedEnum::VALUE_1, $result);
+    }
+
+    public function testTransformEnumWithInvalidBackedEnum(): void
+    {
+        $this->expectException(BadParamException::class);
+        DTOTransformer::transformEnum(TestBackedEnum::class, 2);
+    }
+
+    public function testTransformEnumWithInvalidTypeBackedEnum(): void
+    {
+        $this->expectException(\TypeError::class);
+        DTOTransformer::transformEnum(TestBackedEnum::class, 'sd');
+    }
+
+    public function testTransformEnumWithValidNonBackedEnum(): void
+    {
+        $result = DTOTransformer::transformEnum(TestNonBackedEnum::class, 'CASE_ONE');
+        $this->assertSame(TestNonBackedEnum::CASE_ONE, $result);
+    }
+
+    public function testTransformEnumWithInvalidNonBackedEnumValue(): void
+    {
+        $result = DTOTransformer::transformEnum(TestNonBackedEnum::class, 'INVALID_CASE');
+        $this->assertSame('INVALID_CASE', $result);
+    }
+
+    public function testIsSupportClass(): void
+    {
+
+        // Valid class check
+        $this->assertTrue(DTOTransformer::isSupportClass(DummyDTO::class), 'Expected true for a valid class.');
+
+        // Invalid/nonexistent class check
+        $this->assertTrue(DTOTransformer::isSupportClass('NonExistentClass'), 'Expected true for a nonexistent class.');
+
+        // Non-class string check
+        $this->assertTrue(DTOTransformer::isSupportClass('NotAClass'), 'Expected true for a random string.');
+    }
+
     public function testFromArrayAndToArray(): void
     {
         $input = ['id' => 1, 'name' => 'Test'];

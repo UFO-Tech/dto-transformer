@@ -8,6 +8,7 @@ use phpDocumentor\Reflection\Types;
 use phpDocumentor\Reflection\Types\ContextFactory;
 use ReflectionException;
 
+use Ufo\DTO\DTOTransformer;
 use function array_map;
 use function class_exists;
 use function dirname;
@@ -197,7 +198,7 @@ enum TypeHintResolver: string
         if ($isObject) {
             $fqsen = method_exists($type, 'getFqsen') ? $type->getFqsen() : null;
             $t = ltrim($type, '\\');
-            $fqcn = !is_null($fqsen) ? ($classes[$t] ?? null) : null;
+            $fqcn = !is_null($fqsen) ? (self::typeWithNamespaceOrDefault($t, $classes, DTOTransformer::DTO_NS_KEY)) : null;
             if (!$fqcn && class_exists($t)) {
                 $fqcn = $t;
             }
@@ -317,6 +318,18 @@ enum TypeHintResolver: string
         return !empty($namespace) ? $namespace . '\\' . $type : $type;
     }
 
+    public static function typeWithNamespaceOrDefault(string $type, array $namespaces = [], ?string $defaultKey = null): ?string
+    {
+        $class = $namespaces[$type] ?? null;
+
+        if (!$class) {
+            $namespace = $namespaces[$defaultKey] ?? null;
+            $class = !empty($namespace) ? $namespace . '\\' . $type : $type;
+            if (!class_exists($class)) $class = null;
+        }
+        return $class;
+    }
+
     /**
      * @param array $schema
      * @param callable(array):array $call
@@ -333,6 +346,23 @@ enum TypeHintResolver: string
         }
 
         return $call($schema);
+    }
+
+    /**
+     * @param array $schema
+     * @param callable(array):void $call
+     */
+    public static function filterSchema(array $schema, callable $call): void
+    {
+        if ($schema[self::ONE_OFF] ?? false) {
+            foreach ($schema[self::ONE_OFF] as $desc) {
+                self::filterSchema($desc, $call);
+            }
+        } elseif ($schema[self::ITEMS] ?? false) {
+            self::filterSchema($schema[self::ITEMS], $call);
+        }
+
+        $call($schema);
     }
 
 }
