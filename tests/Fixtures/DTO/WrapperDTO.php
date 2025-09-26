@@ -15,7 +15,9 @@ class WrapperDTO  implements IArrayConstructible, IArrayConvertible
     use ArrayConstructibleTrait, ArrayConvertibleTrait;
 
     public function __construct(
-        #[AttrDTO(dtoFQCN: DummyDTO::class, collection: true)]
+        #[AttrDTO(dtoFQCN: DummyDTO::class, context: [
+            AttrDTO::C_COLLECTION => true
+        ])]
         public DummyDTO|array $items
     ) {}
 }

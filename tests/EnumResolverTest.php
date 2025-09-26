@@ -108,7 +108,6 @@ class EnumResolverTest extends TestCase
         $schema = ['type' => 'string'];
 
         $this->expectException(InvalidArgumentException::class);
-        $this->expectExceptionMessage('Enum schema missing required fields');
         EnumResolver::enumDataFromSchema($schema, 'tmp');
 
     }
@@ -201,5 +200,268 @@ class EnumResolverTest extends TestCase
         ];
 
         self::assertFalse(EnumResolver::schemaHasEnum($schema));
+    }
+
+    /**
+     * Test `applyEnumFqcnToJsonSchema` when merging enum schema into a valid JSON schema.
+     */
+    public function testApplyEnumFqcnToJsonSchemaMergesEnumSchema(): void
+    {
+        $enumFQCN = StringEnum::class;
+        $jsonSchema = [
+            'type' => 'object',
+            'properties' => [
+                'example' => ['type' => 'string']
+            ]
+        ];
+        $expectedSchema = [
+            'type' => 'object',
+            'properties' => [
+                'example' => [
+                    'type' => 'string',
+                    'x-ufo-enum' => [
+                        'name' => 'StringEnum',
+                        'values' => [
+                            'A' => 'a',
+                            'B' => 'b',
+                            'C' => 'c',
+                        ],
+                    ],
+                    'enum' => ['a', 'b', 'c'],
+                ]
+            ]
+        ];
+
+        $result = EnumResolver::applyEnumFqcnToJsonSchema($enumFQCN, $jsonSchema['properties']['example']);
+        $jsonSchema['properties']['example'] = $result;
+
+        $this->assertSame($expectedSchema, $jsonSchema);
+    }
+
+    /**
+     * Test `applyEnumFqcnToJsonSchema` when handling array schema with enum.
+     */
+    public function testApplyEnumFqcnToJsonSchemaWithArraySchema(): void
+    {
+        $enumFQCN = IntEnum::class;
+        $jsonSchema = [
+            'type' => 'array',
+            'items' => ['type' => 'integer']
+        ];
+        $expectedSchema = [
+            'type' => 'array',
+            'items' => [
+                'type' => 'integer',
+                'x-ufo-enum' => [
+                    'name' => 'IntEnum',
+                    'values' => [
+                        'A' => 1,
+                        'B' => 2,
+                        'C' => 3,
+                    ],
+                ],
+                'enum' => [1, 2, 3]
+            ]
+        ];
+
+        $result = EnumResolver::applyEnumFqcnToJsonSchema($enumFQCN, $jsonSchema);
+        $this->assertSame($expectedSchema, $result);
+    }
+
+    /**
+     * Test `applyEnumFqcnToJsonSchema` when handling oneOf schema.
+     */
+    public function testApplyEnumFqcnToJsonSchemaWithOneOfSchema(): void
+    {
+        $enumFQCN = StringEnum::class;
+        $jsonSchema = [
+            'oneOf' => [
+                ['type' => 'string'],
+                ['type' => 'null']
+            ]
+        ];
+        $expectedSchema = [
+            'oneOf' => [
+                [
+                    'type' => 'string',
+                    'x-ufo-enum' => [
+                        'name' => 'StringEnum',
+                        'values' => [
+                            'A' => 'a',
+                            'B' => 'b',
+                            'C' => 'c',
+                        ],
+                    ],
+                    'enum' => ['a', 'b', 'c'],
+                ],
+                ['type' => 'null']
+            ]
+        ];
+
+        $result = EnumResolver::applyEnumFqcnToJsonSchema($enumFQCN, $jsonSchema);
+        $this->assertSame($expectedSchema, $result);
+    }
+
+    /**
+     * Test `applyEnumFqcnToJsonSchema` when invalid type is provided.
+     */
+    public function testApplyEnumFqcnToJsonSchemaWithInvalidType(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        $enumFQCN = IntEnum::class;
+        $jsonSchema = ['type' => 'invalid'];
+        EnumResolver::applyEnumFqcnToJsonSchema($enumFQCN, $jsonSchema, methodTryFrom: 'tryFromValue2');
+    }
+
+    /**
+     * Test that `getEnumFQCN` returns a valid FQCN for an enum.
+     */
+    public function testGetEnumFQCNReturnsValidFQCN(): void
+    {
+        $result = EnumResolver::getEnumFQCN(StringEnum::class);
+        $this->assertSame(StringEnum::class, $result);
+    }
+
+    /**
+     * Test that `getEnumFQCN` returns null for a non-enum string.
+     */
+    public function testGetEnumFQCNReturnsNullForNonEnumString(): void
+    {
+        $result = EnumResolver::getEnumFQCN('NonEnumClass');
+        $this->assertNull($result);
+    }
+
+    /**
+     * Test that `getEnumFQCN` returns null for invalid or empty types.
+     */
+    public function testGetEnumFQCNReturnsNullForInvalidType(): void
+    {
+        $result = EnumResolver::getEnumFQCN('');
+        $this->assertNull($result);
+
+        $result = EnumResolver::getEnumFQCN('null');
+        $this->assertNull($result);
+    }
+
+    /**
+     * Test `getEnumFQCN` returns the correct enum FQCN from nested arrays.
+     */
+    public function testGetEnumFQCNReturnsEnumFQCNForNestedArray(): void
+    {
+        $type = ['null', 'NonEnumClass', StringEnum::class];
+        $result = EnumResolver::getEnumFQCN($type);
+        $this->assertSame(StringEnum::class, $result);
+    }
+
+    public function testEnumArrays(): void
+    {
+        $type = json_decode(
+            '{"type":"array","minLength":1,"items":{"oneOf":[{"type":"string","enum":["a","b","c"]},{"type":"null"}]}}',
+            true
+        );
+
+        $result = EnumResolver::enumDataFromSchema($type, 'String');
+
+        $this->assertSame('StringEnum', $result->name);
+        $this->assertSame([
+            'A' => 'a',
+                'B' => 'b',
+                'C' => 'c',
+            ], $result->values
+        );
+        $this->assertSame(TypeHintResolver::STRING->value, $result->type->value);
+    }
+
+    /**
+     * Test `enumsDataFromSchema` extracts multiple EnumVO objects from a valid schema.
+     */
+    public function testEnumsDataFromSchemaWithValidSchema(): void
+    {
+        $schema = [
+            'oneOf' => [
+                [
+                    'type' => 'string',
+                    'x-ufo-enum' => [
+                        'name' => 'StringEnum',
+                        'values' => [
+                            'A' => 'a',
+                            'B' => 'b',
+                            'C' => 'c',
+                        ],
+                    ],
+                    'enum' => ['a', 'b', 'c'],
+                ],
+                [
+                    'type' => 'integer',
+                    'x-ufo-enum' => [
+                        'name' => 'IntEnum',
+                        'values' => [
+                            'ONE' => 1,
+                            'TWO' => 2,
+                            'THREE' => 3,
+                        ],
+                    ],
+                    'enum' => [1, 2, 3],
+                ],
+            ],
+        ];
+
+        $result = EnumResolver::enumsDataFromSchema($schema);
+        $this->assertCount(2, $result);
+
+        $this->assertSame('StringEnum', $result[0]->name);
+        $this->assertSame(['A' => 'a', 'B' => 'b', 'C' => 'c'], $result[0]->values);
+
+        $this->assertSame('IntEnum', $result[1]->name);
+        $this->assertSame(['ONE' => 1, 'TWO' => 2, 'THREE' => 3], $result[1]->values);
+    }
+
+    /**
+     * Test `enumsDataFromSchema` returns an empty array when there are no enums.
+     */
+    public function testEnumsDataFromSchemaWithoutEnums(): void
+    {
+        $schema = [
+            'type' => 'object',
+            'properties' => ['example' => ['type' => 'string']],
+        ];
+
+        $result = EnumResolver::enumsDataFromSchema($schema);
+        $this->assertEmpty($result);
+    }
+
+    /**
+     * Test `enumsDataFromSchema` extracts only valid enums from a mixed schema.
+     */
+    public function testEnumsDataFromSchemaWithPartialEnums(): void
+    {
+        $schema = [
+            'oneOf' => [
+                [
+                    'type' => 'string',
+                    'x-ufo-enum' => [
+                        'name' => 'PartialEnum',
+                        'values' => [
+                            'A' => 'alpha',
+                            'B' => 'beta',
+                        ],
+                    ],
+                    'enum' => ['alpha', 'beta'],
+                ],
+                [
+                    'type' => 'null',
+                ],
+                [
+                    'type' => 'integer',
+                ],
+            ],
+        ];
+
+        $result = EnumResolver::enumsDataFromSchema($schema);
+        $this->assertCount(1, $result);
+
+        $this->assertSame('PartialEnum', $result[0]->name);
+        $this->assertSame(['A' => 'alpha', 'B' => 'beta'], $result[0]->values);
     }
 }

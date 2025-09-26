@@ -9,6 +9,7 @@ use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Tests\Fixtures\DTO\DTOWithEnumAndDTOValue;
+use Ufo\DTO\Tests\Fixtures\DTO\DTOWithEnums;
 use Ufo\DTO\Tests\Fixtures\DTO\DTOWithEnumValue;
 use Ufo\DTO\Tests\Fixtures\Enum\IntEnum;
 use Ufo\DTO\Tests\Fixtures\Enum\StringEnum;
@@ -170,5 +171,19 @@ class DTOTransformerEnumTest extends TestCase
                 'name' => 'Test'
             ]
         ]);
+    }
+
+    public function testFromArrayDTOWithEnums(): void
+    {
+        /**
+         * @var DTOWithEnums $result
+         */
+        $result = DTOTransformer::fromArray(DTOWithEnums::class, [
+            'enums' => ['a', '1']
+        ]);
+
+        $this->assertCount(2, $result->enums);
+        $this->assertInstanceOf(StringEnum::class, $result->enums[0]);
+        $this->assertInstanceOf(IntEnum::class, $result->enums[1]);
     }
 }

@@ -4,11 +4,13 @@ namespace Ufo\DTO\Tests;
 
 
 use PHPUnit\Framework\TestCase;
+use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\DTOWithEnumValue;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 use Ufo\DTO\Tests\Fixtures\Enum\IntEnum;
 use Ufo\DTO\Tests\Fixtures\Enum\StringEnum;
 
@@ -35,7 +37,13 @@ class TypeHintResolverTest extends TestCase
     {
         $uses = TypeHintResolver::getUsesNamespaces(MemberWithFriendsDTO::class);
         $this->assertIsArray($uses);
-        $this->assertArrayHasKey('DummyDTO', $uses); // Example namespace alias
+        $this->assertArrayHasKey(DTOTransformer::DTO_NS_KEY, $uses);
+
+        $classFQCN = TypeHintResolver::typeWithNamespaceOrDefault(
+            'UserDto', $uses, DTOTransformer::DTO_NS_KEY
+        );
+
+        $this->assertSame(UserDto::class, $classFQCN);
     }
 
     public function testGetUsesNamespacesWithInvalidClass(): void

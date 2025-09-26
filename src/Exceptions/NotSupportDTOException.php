@@ -2,7 +2,7 @@
 
 namespace Ufo\DTO\Exceptions;
 
-class NotSupportDTOException extends \InvalidArgumentException
+class NotSupportDTOException extends BadParamException
 {
 
 }

@@ -13,9 +13,18 @@
             <directory>tests</directory>
         </testsuite>
     </testsuites>
+
     <source>
         <include>
             <directory suffix=".php">src</directory>
         </include>
     </source>
+
+    <coverage>
+        <report>
+            <text outputFile="php://stdout"/>
+            <html outputDirectory="build/coverage" lowUpperBound="50" highLowerBound="90"/>
+            <cobertura outputFile="build/coverage/coverage.xml"/>
+        </report>
+    </coverage>
 </phpunit>

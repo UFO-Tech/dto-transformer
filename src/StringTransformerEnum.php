@@ -19,12 +19,15 @@ enum StringTransformerEnum: string
 
     public static function transformName(string $value): string
     {
+        $value = self::transliterate(self::alias($value));
+        if ($value === mb_strtoupper($value)) return $value;
+
         $valueName = self::alias($value);
         if ($valueName === $value) {
             if (ctype_digit($value[0])) {
                 $value = 'case_' . $value;
             }
-            $valueName =  strtoupper(preg_replace('/(?<!^)[A-Z]/', '_$0', self::transliterate($value)));
+            $valueName =  strtoupper(preg_replace('/(?<!^)(?<!_)[A-Z]/', '_$0', self::transliterate($value)));
         }
         return $valueName;
     }

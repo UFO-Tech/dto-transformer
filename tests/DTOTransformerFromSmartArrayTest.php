@@ -8,6 +8,8 @@ use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\DocblockDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\DTOWithEnumValue;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO2;
 use Ufo\DTO\Tests\Fixtures\DTO\ItemDTO;
@@ -256,5 +258,54 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
         $this->assertInstanceOf(DummyDTO::class, $restored2->friend);
     }
 
+    public function testDTOWithDocblock(): void
+    {
+        $dto = DTOTransformer::fromArray(DocblockDTO::class, [
+            'name' => 'explicit-user',
+            'collection' => [
+                [
+                    'id' => 123,
+                    'name' => 'explicit-user',
+                ]
+            ]
+        ]);
 
+        $dto2 = DTOTransformer::fromArray(DocblockDTO::class, [
+            'name' => 'explicit-user',
+            'collection' => [
+                [
+                    'email' => 'email',
+                    'name' => 'explicit-user',
+                ]
+            ]
+        ]);
+
+        $dto3 = DTOTransformer::fromArray(DocblockDTO::class, [
+            'name' => 'explicit-user',
+            'collection' => [
+                [
+                    'id' => 123,
+                    'name' => 'explicit-user',
+                ],
+                [
+                    'email' => 'email',
+                    'name' => 'explicit-user',
+                ],
+                [
+                    '$className' => 'DTOWithEnumValue',
+                    'stringEnum' => 'a',
+                    'intEnum' => 1,
+                ]
+            ]
+        ]);
+
+        $this->assertInstanceOf(DocblockDTO::class, $dto);
+        $this->assertInstanceOf(DummyDTO::class, $dto->collection[0]);
+        $this->assertInstanceOf(DocblockDTO::class, $dto2);
+        $this->assertInstanceOf(UserDto::class, $dto2->collection[0]);
+        $this->assertInstanceOf(DocblockDTO::class, $dto3);
+        $this->assertInstanceOf(UserDto::class, $dto3->collection[1]);
+        $this->assertInstanceOf(DummyDTO::class, $dto3->collection[0]);
+        $this->assertInstanceOf(DTOWithEnumValue::class, $dto3->collection[2]);
+    }
 }

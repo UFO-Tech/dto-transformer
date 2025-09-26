@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Ufo\DTO\Tests;
 
 use PHPUnit\Framework\TestCase;
-use Ufo\DTO\BaseDTOFromArrayTransformer;
 use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
+use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ItemDTO;
@@ -18,9 +18,51 @@ use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithUnionTypeDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UnionWithScalarDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 use Ufo\DTO\Tests\Fixtures\DTO\WrapperDTO;
+use Ufo\DTO\Tests\Fixtures\Enum\TestBackedEnum;
+use Ufo\DTO\Tests\Fixtures\Enum\TestNonBackedEnum;
 
 final class DTOTransformerTest extends TestCase
 {
+    public function testTransformEnumWithValidBackedEnum(): void
+    {
+        $result = DTOTransformer::transformEnum(TestBackedEnum::class, 1);
+        $this->assertSame(TestBackedEnum::VALUE_1, $result);
+    }
+
+    public function testTransformEnumWithInvalidBackedEnum(): void
+    {
+        $this->expectException(BadParamException::class);
+        DTOTransformer::transformEnum(TestBackedEnum::class, 2);
+    }
+
+    public function testTransformEnumWithInvalidTypeBackedEnum(): void
+    {
+        $this->expectException(\TypeError::class);
+        DTOTransformer::transformEnum(TestBackedEnum::class, 'sd');
+    }
+
+    public function testTransformEnumWithValidNonBackedEnum(): void
+    {
+        $result = DTOTransformer::transformEnum(TestNonBackedEnum::class, 'CASE_ONE');
+        $this->assertSame(TestNonBackedEnum::CASE_ONE, $result);
+    }
+
+    public function testTransformEnumWithInvalidNonBackedEnumValue(): void
+    {
+        $result = DTOTransformer::transformEnum(TestNonBackedEnum::class, 'INVALID_CASE');
+        $this->assertSame('INVALID_CASE', $result);
+    }
+
+    public function testIsSupportClass(): void
+    {
+
+        // Valid class check
+        $this->assertTrue(DTOTransformer::isSupportClass(DummyDTO::class), 'Expected true for a valid class.');
+
+        // Invalid/nonexistent class check
+        $this->assertFalse(DTOTransformer::isSupportClass('NonExistentClass'), 'Expected true for a nonexistent class.');
+    }
+
     public function testFromArrayAndToArray(): void
     {
         $input = ['id' => 1, 'name' => 'Test'];
@@ -417,5 +459,64 @@ final class DTOTransformerTest extends TestCase
 
         $this->expectException(BadParamException::class);
         DTOTransformer::fromArray(WrapperDTO::class, $input);
+    }
+
+    public function testFromArrayWithMultipleClassNames(): void
+    {
+        $dataUser = ['name' => 'name1', 'email' => 'email@email.com'];
+        $dataDummy = ['id' => 1, 'name' => 'name1'];
+        $classFQCN = 'UnsupportedClass|' . UserDto::class . '|' . DummyDTO::class;
+
+        $user = DTOTransformer::fromArray($classFQCN, $dataUser);
+
+        $this->assertInstanceOf(UserDto::class, $user);
+        $this->assertEquals($dataUser['name'], $user->name);
+        $this->assertEquals($dataUser['email'], $user->email);
+
+        $dummy = DTOTransformer::fromArray($classFQCN, $dataDummy);
+
+        $this->assertInstanceOf(DummyDTO::class, $dummy);
+        $this->assertEquals($dataDummy['id'], $dummy->id);
+        $this->assertEquals($dataDummy['name'], $dummy->name);
+    }
+
+    public function testFromArrayWithMultipleClassNamesWithDefaultNamespace(): void
+    {
+        $data = ['name' => 'name1', 'email' => 'email@email.com'];
+        $classFQCN = 'UnsupportedClass|' . 'Fixtures\DTO\UserDto' . '|' . DummyDTO::class;
+
+        $result = DTOTransformer::fromArray($classFQCN, $data, namespaces: [
+            DTOTransformer::DTO_NS_KEY => 'Ufo\DTO\Tests',
+        ]);
+
+        $this->assertInstanceOf(UserDto::class, $result);
+        $this->assertEquals($data['name'], $result->name);
+        $this->assertEquals($data['email'], $result->email);
+    }
+
+    public function testBadParamFromArrayWithMultipleClass(): void
+    {
+        $this->expectException(BadParamException::class);
+
+        $data = ['id' => "dasdds", 'name' => 'email@email.com'];
+        $classFQCN = 'UnsupportedClass|' . 'Fixtures\DTO\UserDto' . '|' . DummyDTO::class;
+
+        try {
+            DTOTransformer::fromArray($classFQCN, $data, namespaces: [
+                DTOTransformer::DTO_NS_KEY => 'Ufo\DTO\Tests',
+            ]);
+        } catch (BadParamException $e) {
+            throw $e;
+        }
+    }
+
+    public function testNotSupportFromArrayWithMultipleClass(): void
+    {
+        $this->expectException(BadParamException::class);
+
+        $data = ['name' => 1, 'email' => 'email@email.com'];
+        $classFQCN = 'UnsupportedClass|Fixtures\DTO\UserDto';
+
+        DTOTransformer::fromArray($classFQCN, $data, namespaces: []);
     }
 }

@@ -77,7 +77,10 @@ class MemberWithFriendsDTO implements IArrayConstructible, IArrayConvertible
 
     public function __construct(
         public User $user
-        #[AttrDTO(User::class, collection: true, renameKeys: ['randomNumber' => null])]
+        #[AttrDTO(User::class, context: [
+            AttrDTO::C_COLLECTION => true,
+            AttrDTO::C_RENAME_KEYS => ['randomNumber' => null]
+        ])]
         public array $friends
     ) {}
 }
@@ -147,6 +150,48 @@ $data = DTOTransformer::toArray($dto);
 //];
 ```
 
+
+# 📖 DocBlock Support
+
+The library supports reading DocBlock annotations for constructors and public DTO properties.  
+This makes it possible to accurately detect expected types even if they are not explicitly declared in the signature.
+
+```php
+    use Ufo\DTO\Tests\Fixtures\Enum\IntEnum;
+
+    class DocblockDTO
+    {
+        /**
+         * @var array<UserDto|DummyDTO>
+         */
+        public array $formatedCollection = [];
+    
+        /**
+         * @param array<UserDto|DummyDTO|IntEnum> $collection
+         */
+        public function __construct(
+            public string $name,
+            public array $collection
+        ) {}
+    }
+```
+
+🔍 How it works 
+- @var and @param annotations are parsed automatically. 
+- The library detects union types (UserDto|DummyDTO|IntEnum) and builds the correct collection.
+- Supported types:
+  - DTO classes (e.g., UserDto, DummyDTO)
+  - Enums (e.g., IntEnum)
+  - Mixed-type arrays
+
+🚀 Example
+
+When calling DocblockDTO::fromArray($data), the library will automatically:
+1.	Convert array elements into the correct DTO or enum.
+2.	Ensure type safety according to the DocBlock.
+3.	Build a fully initialized object with collections of the required types.
+
+
 ---
 
 ## 🔧 Custom Transformer Example
@@ -200,7 +245,10 @@ class MemberWithOrdersDTO implements IArrayConstructible, IArrayConvertible
 
     public function __construct(
         public User $user,
-        #[AttrDTO(Order::class, collection: true, transformerFQCN: OrderTransformer::class)]
+        #[AttrDTO(Order::class, context: [
+            AttrDTO::C_COLLECTION => true,
+            AttrDTO::C_TRANSFORMER => OrderTransformer::class
+        ])]
         public array $orders
     ) {}
 }
@@ -242,3 +290,5 @@ This transformer:
 * Type-safe, self-descriptive, and composable architecture;
 * Simple attribute-based field control without code duplication;
 * Standardized DTO handling for SOA and microservices environments.
+
+

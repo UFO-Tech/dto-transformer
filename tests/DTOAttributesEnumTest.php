@@ -87,7 +87,10 @@ class DTOAttributesEnumTest extends TestCase
         return new UserDto('testName', 'testEmail');
     }
 
-    #[AttrDTO(MemberDto::class, collection: true)]
+
+    #[AttrDTO(MemberDto::class, context: [
+        AttrDTO::C_COLLECTION => true
+    ])]
     protected function getMemberDtoCollection(): array
     {
         return [
@@ -96,13 +99,17 @@ class DTOAttributesEnumTest extends TestCase
         ];
     }
 
-    #[AttrDTO(ValidDTO::class, transformerFQCN: UpperTransformer::class)]
+    #[AttrDTO(ValidDTO::class, context: [
+        AttrDTO::C_TRANSFORMER => UpperTransformer::class
+    ])]
     protected function getCustomTransformerValidDTO(): array
     {
         return ['name' => 'lower_case'];
     }
 
-    #[AttrDTO(DummyDTO::class, transformerFQCN: UpperTransformer::class)]
+    #[AttrDTO(DummyDTO::class, context: [
+        AttrDTO::C_TRANSFORMER => UpperTransformer::class
+    ])]
     protected function getCustomTransformerInvalidDTO(): array
     {
         return ['name' => 'invalid_case'];
