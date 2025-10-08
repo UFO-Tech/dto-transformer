@@ -122,7 +122,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
                         mixed               $data,
                         ReflectionParameter $param,
                     ) use (&$constructParams, $reflectionClass, $namespaces, $classes, $paramsDocTypes) {
-                        $constructParams[] = static::extractValue(
+                        $constructParams[$param->getName()] = static::extractValue(
                             $keys->dataKey, $data, $param, $reflectionClass, namespaces: $namespaces, classes: $classes, paramsDocTypes: $paramsDocTypes
                         );
                     },
@@ -330,20 +330,22 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
     }
 
     protected static function getDockType(
-        ReflectionProperty $property,
+        ReflectionProperty|ReflectionParameter $property,
         array $namespaces = [],
         array $paramsDocTypes = [],
         bool $isCollection = false
     ): array
     {
-        $docBlockText = $property->getDocComment() ?: ' ';
-        $docBlock = DocBlockFactory::createInstance()->create($docBlockText);
-        $docType = (string) ($docBlock->getTags('var')[0] ?? $paramsDocTypes[$property->getName()] ?? ' ');
-        $docType = (empty($docType)) ? $property->getType() : $docType;
+        $docType = (string) ($paramsDocTypes[$property->getName()] ?? ' ');
+        if ($property instanceof ReflectionProperty) {
+            $docBlockText = $property->getDocComment() ?: ' ';
+            $docBlock = DocBlockFactory::createInstance()->create($docBlockText);
+            $docType = (string) ($docBlock->getTags('var')[0] ?? $docType);
+        }
+        $docType =  (string) ((empty($docType)) ? $property->getType() : $docType);
 
         $jsonSchema = TypeHintResolver::typeDescriptionToJsonSchema($docType, $namespaces);
 
-//        $bool = EnumResolver::schemaHasEnum($jsonSchema);
         $context = [
             AttrDTO::C_COLLECTION => $isCollection,
             AttrDTO::C_NS => $namespaces,
