@@ -361,8 +361,8 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
                 if ($enumName = $item[EnumResolver::ENUM][EnumResolver::ENUM_NAME] ?? false) {
                     $classFQCN = TypeHintResolver::typeWithNamespaceOrDefault($enumName, $namespaces, static::DTO_NS_KEY);
                     $context[AttrDTO::C_IS_ENUM] = true;
-                } elseif ($item['classFQCN'] ?? false) {
-                    $classFQCN = $item['classFQCN'];
+                } elseif ($item[TypeHintResolver::CLASS_FQCN] ?? false) {
+                    $classFQCN = $item[TypeHintResolver::CLASS_FQCN];
                 }
 
                 if ($classFQCN) {

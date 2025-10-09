@@ -52,6 +52,8 @@ enum TypeHintResolver: string
     const string ITEMS = 'items';
     const string ONE_OFF = 'oneOf';
     const string REF = '$ref';
+    const string ADDITIONAL_PROPERTIES = 'additionalProperties';
+    const string CLASS_FQCN = 'classFQCN';
 
     public static function normalize(string $type): string
     {
@@ -100,7 +102,7 @@ enum TypeHintResolver: string
                     $type = implode('|', $types);
                 }
 
-            } elseif (!isset($type['classFQCN']) && ($type[self::TYPE] ?? '') === self::OBJECT->value && isset($type['additionalProperties'])) {
+            } elseif (!isset($type[self::CLASS_FQCN]) && ($type[self::TYPE] ?? '') === self::OBJECT->value && isset($type[self::ADDITIONAL_PROPERTIES])) {
                 $type = self::ARRAY->value;
             } elseif ($enumName = EnumResolver::findEnumNameInJsonSchema($type)) {
                 $type = self::typeWithNamespace($enumName, $namespaces, 'enum');
@@ -202,16 +204,16 @@ enum TypeHintResolver: string
             if (!$fqcn && class_exists($t)) {
                 $fqcn = $t;
             }
-            $fqcn = ($fqcn ? ['classFQCN' => $fqcn] : []);
+            $fqcn = ($fqcn ? [self::CLASS_FQCN => $fqcn] : []);
 
 
-            if (enum_exists($fqcnS = $fqcn['classFQCN'] ?? '')) {
+            if (enum_exists($fqcnS = $fqcn[self::CLASS_FQCN] ?? '')) {
                 return EnumResolver::generateEnumSchema($fqcnS);
             }
 
             return [
                 ...[self::TYPE => self::OBJECT->value],
-                ...['additionalProperties' =>
+                ...[self::ADDITIONAL_PROPERTIES =>
                     method_exists($type, 'getFqsen') ?: null
                         ?? (method_exists($type, 'getValueType') ? self::typeToSchema($type->getValueType(), $classes) : true)
                 ],
@@ -281,8 +283,8 @@ enum TypeHintResolver: string
         }
         $type = self::jsonSchemaToPhp($schema, $namespaces);
 
-        if (($type === self::OBJECT->value || $type === self::ARRAY->value) && is_array($schema['additionalProperties'] ?? null)) {
-            $valueType = self::jsonSchemaToTypeDescription($schema['additionalProperties'], $namespaces);
+        if (($type === self::OBJECT->value || $type === self::ARRAY->value) && is_array($schema[self::ADDITIONAL_PROPERTIES] ?? null)) {
+            $valueType = self::jsonSchemaToTypeDescription($schema[self::ADDITIONAL_PROPERTIES], $namespaces);
             return sprintf('array<string,%s>', $valueType);
         }
 
@@ -299,8 +301,8 @@ enum TypeHintResolver: string
                 return sprintf("%s<%s>", self::ARRAY->value, $valueType);
             }
         }
-        if ($type === self::OBJECT->value && isset($schema['classFQCN'])) {
-            return $schema['classFQCN'];
+        if ($type === self::OBJECT->value && isset($schema[self::CLASS_FQCN])) {
+            return $schema[self::CLASS_FQCN];
         }
 
         return $type;
@@ -337,6 +339,8 @@ enum TypeHintResolver: string
             }
         } elseif ($schema[self::ITEMS] ?? false) {
             $schema[self::ITEMS] = self::applyToSchema($schema[self::ITEMS], $call, $schema);
+        } elseif (($schema[self::ADDITIONAL_PROPERTIES] ?? false) && is_array($schema[self::ADDITIONAL_PROPERTIES])) {
+            $schema[self::ADDITIONAL_PROPERTIES] = self::applyToSchema($schema[self::ADDITIONAL_PROPERTIES], $call, $schema);
         }
 
         return $call($schema, $parentShema);
@@ -344,7 +348,8 @@ enum TypeHintResolver: string
 
     /**
      * @param array $schema
-     * @param callable(array, ):void $call
+     * @param callable(array, array):void $call
+     * @param array $parentShema
      */
     public static function filterSchema(array $schema, callable $call, array $parentShema = []): void
     {
@@ -354,6 +359,8 @@ enum TypeHintResolver: string
             }
         } elseif ($schema[self::ITEMS] ?? false) {
             self::filterSchema($schema[self::ITEMS], $call, $schema);
+        } elseif (($schema[self::ADDITIONAL_PROPERTIES] ?? false) && is_array($schema[self::ADDITIONAL_PROPERTIES])) {
+            self::filterSchema($schema[self::ADDITIONAL_PROPERTIES], $call, $schema);
         }
 
         $call($schema, $parentShema);
