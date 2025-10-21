@@ -99,7 +99,7 @@ enum TypeHintResolver: string
                 if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
                     $type = '?' . current(array_filter($types, fn($t) => $t !== self::NULL->value));
                 } else {
-                    $type = implode('|', $types);
+                    $type = implode('|', array_unique($types));
                 }
 
             } elseif (!isset($type[self::CLASS_FQCN]) && ($type[self::TYPE] ?? '') === self::OBJECT->value && isset($type[self::ADDITIONAL_PROPERTIES])) {

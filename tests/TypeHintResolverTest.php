@@ -564,4 +564,16 @@ class TypeHintResolverTest extends TestCase
         $this->assertEquals('DefaultNS\StringEnum', $typeDescStringWithNamespace);
 
     }
+
+
+
+
+    public function testJsonSchemaToPhpWithMoreArrayType(): void
+    {
+        $schema = json_decode('{"oneOf":[{"type":"array","items":{"type":"string"}},{"type":"array","items":{"type":"integer"}}]}', true);
+
+        $resultCollection = TypeHintResolver::jsonSchemaToPhp($schema);
+
+        $this->assertSame('array', $resultCollection);
+    }
 }
