@@ -180,7 +180,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         $attr = $param->getAttributes(AttrAssertions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
         if ($attr) {
             DTOAttributesEnum::ASSERTIONS->process(
-                $attr->newInstance(), $data[$keys->dataKey], $param, static::class
+                $attr->newInstance(), $data[$keys->dataKey] ?? [], $param, static::class
             );
         }
 
