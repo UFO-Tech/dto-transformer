@@ -47,7 +47,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
      *
      * @return array An associative array of the object's properties.
      */
-    public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = true): array
+    public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = false): array
     {
         $reflection = new ReflectionClass($dto);
         $properties = $reflection->getProperties();
