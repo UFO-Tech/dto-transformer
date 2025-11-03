@@ -32,7 +32,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
     {
         $dto = new DummyDTO(5, 'john');
 
-        $arr = DTOTransformer::toArray($dto);
+        $arr = DTOTransformer::toArray($dto, asSmartArray: true);
 
         $this->assertSame(5, $arr['id']);
         $this->assertSame('john', $arr['name']);
@@ -45,7 +45,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
     {
         $src = new DummyDTO(7, 'alice');
 
-        $smart = DTOTransformer::toArray($src);
+        $smart = DTOTransformer::toArray($src, asSmartArray: true);
         $restored = DTOTransformer::fromSmartArray($smart, namespaces: $this->namespaces());
 
         $this->assertInstanceOf(DummyDTO::class, $restored);
@@ -57,7 +57,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
     {
         $src = new AliasDTO(id: 10, name: 'qwe');
 
-        $smart = DTOTransformer::toArray($src);
+        $smart = DTOTransformer::toArray($src, asSmartArray: true);
         $restored = DTOTransformer::fromSmartArray($smart, namespaces: $this->namespaces());
 
         $this->assertInstanceOf(AliasDTO::class, $restored);
@@ -69,7 +69,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
     {
         $src = new ObjectWithArrayDTO(name: 'bucket', data: ['a' => 1, 'b' => ['x' => 2]]);
 
-        $smart = DTOTransformer::toArray($src);
+        $smart = DTOTransformer::toArray($src, asSmartArray: true);
         $restored = DTOTransformer::fromSmartArray($smart, namespaces: $this->namespaces());
 
         $this->assertInstanceOf(ObjectWithArrayDTO::class, $restored);
