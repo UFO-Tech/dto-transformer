@@ -37,23 +37,41 @@ enum EnumResolver:string
     {
         $refEnum = new \ReflectionEnum($enumFQCN);
 
-        $data = array_column($enumFQCN::cases(), 'value', 'name');
-        if (method_exists($enumFQCN, $methodGetValues) && method_exists($enumFQCN, $methodTryFrom)) {
-            foreach (call_user_func([$enumFQCN, $methodGetValues]) as $value) {
-                $enum = call_user_func([$enumFQCN, $methodTryFrom], $value) ?? throw new InvalidArgumentException('Invalid value "' . $value . '" for enum ' . $enumFQCN);
-                $data[$enum->name] = $value;
+        if ($refEnum->isBacked()) {
+            /** @var class-string<\BackedEnum> $enumFQCN */
+            $data = array_column($enumFQCN::cases(), 'value', 'name');
+
+            if (method_exists($enumFQCN, $methodGetValues) && method_exists($enumFQCN, $methodTryFrom)) {
+                foreach (call_user_func([$enumFQCN, $methodGetValues]) as $value) {
+                    $enum = call_user_func([$enumFQCN, $methodTryFrom], $value)
+                            ?? throw new InvalidArgumentException('Invalid value "' . $value . '" for enum ' . $enumFQCN);
+
+                    $data[$enum->name] = $value;
+                }
             }
+
+            $jsonType = T::phpToJsonSchema($refEnum->getBackingType()->getName());
+        } else {
+            /** @var class-string<\UnitEnum> $enumFQCN */
+            $data = [];
+
+            foreach ($enumFQCN::cases() as $case) {
+                $data[$case->name] = $case->name;
+            }
+
+            $jsonType = T::STRING->value;
         }
 
         return [
-            T::TYPE => T::phpToJsonSchema($refEnum->getBackingType()->getName()),
+            T::TYPE => $jsonType,
             self::ENUM => [
                 self::ENUM_NAME => $refEnum->getShortName(),
                 self::METHOD_VALUES => $data,
             ],
-            self::ENUM_KEY => array_values($data)
+            self::ENUM_KEY => array_values($data),
         ];
     }
+
 
     public static function findEnumNameInJsonSchema(array $type): ?string
     {

@@ -8,6 +8,7 @@ use ReflectionException;
 use Ufo\DTO\Helpers\EnumResolver;
 use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Tests\Fixtures\Enum\IntEnum;
+use Ufo\DTO\Tests\Fixtures\Enum\OnlyNameEnum;
 use Ufo\DTO\Tests\Fixtures\Enum\StringEnum;
 
 class EnumResolverTest extends TestCase
@@ -32,6 +33,24 @@ class EnumResolverTest extends TestCase
             'enum'       => ['a', 'b', 'c'],
         ];
         $result = EnumResolver::generateEnumSchema(StringEnum::class, EnumResolver::METHOD_VALUES);
+        $this->assertSame($expectedSchema, $result);
+    }
+
+    public function testGenerateEnumSchemaUnitEnum(): void
+    {
+        $expectedSchema = [
+            'type'       => 'string',
+            'x-ufo-enum' => [
+                'name'   => 'OnlyNameEnum',
+                'values' => [
+                    'A' => 'A',
+                    'B' => 'B',
+                    'C' => 'C',
+                ],
+            ],
+            'enum'       => ['A', 'B', 'C'],
+        ];
+        $result = EnumResolver::generateEnumSchema(OnlyNameEnum::class, EnumResolver::METHOD_VALUES);
         $this->assertSame($expectedSchema, $result);
     }
 
