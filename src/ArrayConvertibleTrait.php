@@ -5,8 +5,8 @@ namespace Ufo\DTO;
 trait ArrayConvertibleTrait
 {
     use JsonSerializableTrait;
-    public function toArray(): array
+    public function toArray(bool $publicOnly = true): array
     {
-        return DTOTransformer::toArray($this);
+        return DTOTransformer::toArray($this, publicOnly: $publicOnly);
     }
 }

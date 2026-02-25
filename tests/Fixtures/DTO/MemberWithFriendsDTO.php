@@ -10,7 +10,7 @@ class MemberWithFriendsDTO
         public UserDto $user,
         #[AttrDTO(UserDto::class, context: [
             AttrDTO::C_COLLECTION => true,
-            AttrDTO::C_RENAME_KEYS => ['currentTime' => null],
+            AttrDTO::C_RENAME_KEYS => ['time' => 'currentTime'],
         ])]
         public array $friends
     ) {}

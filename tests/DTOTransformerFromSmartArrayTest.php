@@ -16,6 +16,8 @@ use Ufo\DTO\Tests\Fixtures\DTO\ItemDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithArrayDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 
+use function time;
+
 final class DTOTransformerFromSmartArrayTest extends TestCase
 {
     /**
@@ -38,7 +40,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
         $this->assertSame('john', $arr['name']);
 
         $this->assertArrayHasKey('$className', $arr);
-        $this->assertSame('DummyDTO', $arr['$className']);
+        $this->assertSame(DummyDTO::class, $arr['$className']);
     }
 
     public function testRoundTripDummyDto(): void
@@ -129,6 +131,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
                 '$className' => 'UserDto',
                 'email' => 'email',
                 'name' => 'explicit-user',
+                'currentTime' => time(),
             ],
         ];
 
@@ -151,6 +154,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
                 '$className' => 'UserDto',
                 'id' => 'id',
                 'name' => 'explicit-user',
+                'currentTime' => time(),
             ],
         ];
 
@@ -200,6 +204,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
                 '$className' => 'UserDto',
                 'email' => 'email',
                 'name' => 'explicit-user',
+                'currentTime' => time(),
             ],
         ];
 
@@ -219,6 +224,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
             'friend' => [
                 'email' => 'email',
                 'name' => 'explicit-user',
+                'currentTime' => time(),
             ],
         ];
 
@@ -276,6 +282,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
                 [
                     'email' => 'email',
                     'name' => 'explicit-user',
+                    'currentTime' => time(),
                 ]
             ]
         ]);
@@ -290,6 +297,7 @@ final class DTOTransformerFromSmartArrayTest extends TestCase
                 [
                     'email' => 'email',
                     'name' => 'explicit-user',
+                    'currentTime' => time(),
                 ],
                 [
                     '$className' => 'DTOWithEnumValue',

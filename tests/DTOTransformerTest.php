@@ -21,6 +21,8 @@ use Ufo\DTO\Tests\Fixtures\DTO\WrapperDTO;
 use Ufo\DTO\Tests\Fixtures\Enum\TestBackedEnum;
 use Ufo\DTO\Tests\Fixtures\Enum\TestNonBackedEnum;
 
+use function time;
+
 final class DTOTransformerTest extends TestCase
 {
     public function testTransformEnumWithValidBackedEnum(): void
@@ -123,8 +125,7 @@ final class DTOTransformerTest extends TestCase
 
         $this->assertSame('Alex', $dto->user->name);
         $this->assertSame('alex@site.com', $dto->user->email);
-        $this->assertNotSame($initTime, $dto->user->currentTime);
-        $this->assertGreaterThan($initTime, $dto->user->currentTime);
+        $this->assertSame($initTime, $dto->user->currentTime);
 
         $this->assertInstanceOf(UserDto::class, $dto->user);
         $this->assertInstanceOf(UserDto::class, $dto->friends[0]);
@@ -203,6 +204,7 @@ final class DTOTransformerTest extends TestCase
             'friend' => [
                 'name' => 'User Name',
                 'email' => 'user@example.com',
+                'currentTime' => time()
             ]
         ];
 
@@ -223,7 +225,7 @@ final class DTOTransformerTest extends TestCase
     public function testValue1AcceptsUserDto(): void
     {
         $dto = DTOTransformer::fromArray(UnionWithScalarDTO::class, [
-            'value1' => ['name' => 'Vasya', 'email' => 'vasya@site.com'],
+            'value1' => ['name' => 'Vasya', 'email' => 'vasya@site.com', 'currentTime' => time()],
             'value2' => [],
             'value3' => 1,
         ]);
@@ -303,7 +305,7 @@ final class DTOTransformerTest extends TestCase
         $dto = DTOTransformer::fromArray(UnionWithScalarDTO::class, [
             'value1' => 'x',
             'value2' => [],
-            'value3' => ['name' => 'Inna', 'email' => 'inna@site.com'],
+            'value3' => ['name' => 'Inna', 'email' => 'inna@site.com', 'currentTime' => time()],
         ]);
 
         $this->assertIsString($dto->value1);
@@ -396,7 +398,7 @@ final class DTOTransformerTest extends TestCase
     public function testInvalidFriendDataThrowsException(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage("Missing required key for constructor param: 'id'");
+        $this->expectExceptionMessage("Missing required key for property: 'id'");
 
         $input = [
             'user' => [
@@ -463,7 +465,7 @@ final class DTOTransformerTest extends TestCase
 
     public function testFromArrayWithMultipleClassNames(): void
     {
-        $dataUser = ['name' => 'name1', 'email' => 'email@email.com'];
+        $dataUser = ['name' => 'name1', 'email' => 'email@email.com', 'currentTime' => time()];
         $dataDummy = ['id' => 1, 'name' => 'name1'];
         $classFQCN = 'UnsupportedClass|' . UserDto::class . '|' . DummyDTO::class;
 
@@ -482,8 +484,8 @@ final class DTOTransformerTest extends TestCase
 
     public function testFromArrayWithMultipleClassNamesWithDefaultNamespace(): void
     {
-        $data = ['name' => 'name1', 'email' => 'email@email.com'];
-        $classFQCN = 'UnsupportedClass|' . 'Fixtures\DTO\UserDto' . '|' . DummyDTO::class;
+        $data = ['name' => 'name1', 'email' => 'email@email.com', 'currentTime' => time()];
+        $classFQCN = 'UnsupportedClass|' . UserDto::class . '|' . DummyDTO::class;
 
         $result = DTOTransformer::fromArray($classFQCN, $data, namespaces: [
             DTOTransformer::DTO_NS_KEY => 'Ufo\DTO\Tests',

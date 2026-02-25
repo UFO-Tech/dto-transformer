@@ -33,7 +33,18 @@ use Symfony\Component\Serializer\Attribute\Ignore;
 use UnitEnum;
 use function array_key_exists;
 use function array_map;
+use function class_exists;
+use function enum_exists;
 use function gettype;
+use function is_array;
+use function is_int;
+use function is_null;
+use function is_object;
+use function is_string;
+use function is_subclass_of;
+use function ltrim;
+use function sprintf;
+use function str_contains;
 use function strcasecmp;
 
 class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayTransformer,  IDTOFromArrayTransformer
@@ -47,7 +58,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
      *
      * @return array An associative array of the object's properties.
      */
-    public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = false): array
+    public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = false, bool $publicOnly = true): array
     {
         $reflection = new ReflectionClass($dto);
         $properties = $reflection->getProperties();
@@ -55,38 +66,40 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
 
         foreach ($properties as $property) {
             $keys = static::getPropertyKey($property, $renameKey);
-            if (!$keys->dataKey) continue;
+            if (!$keys->dataKey || ($publicOnly && !$property->isPublic())) continue;
             $value = $property->getValue($dto);
-            $value = static::convertValue($value, $asSmartArray);
+            $value = static::convertValue($value, $asSmartArray, $publicOnly);
             $array[$keys->dataKey] = $value;
         }
 
         if ($asSmartArray) {
-            $array[static::DTO_CLASSNAME] = $reflection->getShortName();
+            $className = $reflection->getName();
+            if ($dto instanceof AttrDTO) $className = $reflection->getShortName();
+            $array[static::DTO_CLASSNAME] = $className;
         }
 
         return $array;
     }
 
-    protected static function convertValue(mixed $value, bool $asSmartArray): mixed
+    protected static function convertValue(mixed $value, bool $asSmartArray, bool $publicOnly = true): mixed
     {
         return match (gettype($value)) {
-            TypeHintResolver::ARRAY->value => static::mapArrayWithKeys($value, $asSmartArray),
-            TypeHintResolver::OBJECT->value => (function () use ($value, $asSmartArray) {
+            TypeHintResolver::ARRAY->value => static::mapArrayWithKeys($value, $asSmartArray, $publicOnly),
+            TypeHintResolver::OBJECT->value => (function () use ($value, $asSmartArray, $publicOnly) {
                 if ($value instanceof UnitEnum) {
                     return $value instanceof BackedEnum ? $value->value : $value->name;
                 }
                 return $value instanceof IArrayConvertible
-                    ? $value->toArray()
-                    : static::toArray($value, asSmartArray: $asSmartArray);
+                    ? $value->toArray($publicOnly)
+                    : static::toArray($value, asSmartArray: $asSmartArray, publicOnly: $publicOnly);
             })(),
             default => $value,
         };
     }
 
-    protected static function mapArrayWithKeys(array $array, bool $asSmartArray): array
+    protected static function mapArrayWithKeys(array $array, bool $asSmartArray, bool $publicOnly = true): array
     {
-        return array_map(fn($v) => static::convertValue($v, $asSmartArray), $array);
+        return array_map(fn($v) => static::convertValue($v, $asSmartArray, $publicOnly), $array);
     }
 
     /**
@@ -100,10 +113,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         array $namespaces = []
     ): object
     {
-        $instance = null;
         $reflectionClass = new ReflectionClass($classFQCN);
-        $constructParams = [];
-        $hasReadonly = static::checkReadonlyInClass($reflectionClass);
 
         $paramsDocTypes = [];
         $constructor = $reflectionClass->getConstructor();
@@ -112,44 +122,26 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         }
         $classes = static::getClassUses($reflectionClass);
 
-        if ($constructor && $constructor->isPublic()) {
-            foreach ($constructor->getParameters() as $param) {
-                static::processParamResolve(
-                    $param,
-                    $data,
-                    function (
-                        TransformKeyVO      $keys,
-                        mixed               $data,
-                        ReflectionParameter $param,
-                    ) use (&$constructParams, $reflectionClass, $namespaces, $classes, $paramsDocTypes) {
-                        $constructParams[$param->getName()] = static::extractValue(
-                            $keys->dataKey, $data, $param, $reflectionClass, namespaces: $namespaces, classes: $classes, paramsDocTypes: $paramsDocTypes
-                        );
-                    },
-                    $renameKey,
-                    $hasReadonly
-                );
-            }
-            $instance = $reflectionClass->newInstanceArgs($constructParams);
-        }
-        $instance = $instance ?? static::createUninitializedInstance($reflectionClass);
-
+        $instance = static::createUninitializedInstance($reflectionClass);
         foreach ($reflectionClass->getProperties() as $property) {
-            if (isset($constructParams[$property->getName()])) continue;
 
             static::processParamResolve(
-                $property,
-                $data,
-                fn (
+                param: $property,
+                data: $data,
+                process: fn (
                     TransformKeyVO $keys,
                     mixed $data,
                     ReflectionProperty $param,
                 ) => $property->setValue($instance, static::extractValue(
-                    $keys->dataKey, $data, $param, $reflectionClass, namespaces: $namespaces, classes: $classes, paramsDocTypes: $paramsDocTypes
+                    key: $keys->dataKey,
+                    data: $data,
+                    ref: $param,
+                    refClass: $reflectionClass,
+                    namespaces: $namespaces,
+                    classes: $classes,
+                    paramsDocTypes: $paramsDocTypes
                 )),
-                $renameKey,
-                $hasReadonly,
-                $constructParams
+                renameKey: $renameKey,
             );
         }
 
@@ -162,21 +154,9 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         array $data,
         callable $process,
         array $renameKey = [],
-        bool $hasReadonly = false,
-        array $ignoreParams = []
     ): void
     {
         $keys = static::getPropertyKey($param, $renameKey);
-
-        $skip = match (true) {
-            $param instanceof ReflectionParameter => !$keys->dataKey,
-            $param instanceof ReflectionProperty => !$keys->dataKey
-                || $param->isReadOnly()
-                || ($hasReadonly && array_key_exists($keys->dtoKey, $ignoreParams))
-        };
-
-        if ($skip) return;
-
         $attr = $param->getAttributes(AttrAssertions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
         if ($attr) {
             DTOAttributesEnum::ASSERTIONS->process(
@@ -185,17 +165,6 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         }
 
         $process($keys, $data, $param);
-    }
-
-    protected static function checkReadonlyInClass(ReflectionClass $reflectionClass): bool
-    {
-        $hasReadonly = false;
-        foreach ($reflectionClass->getProperties() as $property) {
-            if ($property->isReadOnly()) {
-                $hasReadonly = true;
-            }
-        }
-        return $hasReadonly;
     }
 
     public static function isSupportClass(string $classFQCN): bool
@@ -308,9 +277,17 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
                 }
 
             }
-            if ($result) {
-                $value = $result;
+            if ($result) $value = $result;
+        } elseif (is_array($value) && ($value[0][static::DTO_CLASSNAME] ?? false)) {
+            $result = [];
+            foreach ($value as $key => $val) {
+                try {
+                    $result[$key] = static::fromArray($val[static::DTO_CLASSNAME], $val, namespaces: $namespaces);
+                } catch (Throwable $e) {
+                    $result[$key] = $val;
+                }
             }
+            if ($result) $value = $result;
         } elseif (is_array($value)) {
             try {
                 return static::fromSmartArray($value, namespaces: [
@@ -495,13 +472,13 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
     {
         if (is_subclass_of($enumFQCN, BackedEnum::class)) {
             return $enumFQCN::tryFrom($value)
-                ?? throw new BadParamException(
-                    sprintf(
-                        'Invalid value "%s" for enum %s',
-                        $value,
-                        $enumFQCN
-                    )
-                );
+               ?? throw new BadParamException(
+                sprintf(
+                    'Invalid value "%s" for enum %s',
+                    $value,
+                    $enumFQCN
+                )
+            );
         }
 
         foreach ($enumFQCN::cases() as $case) {
@@ -537,19 +514,6 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
 
             if (!TypeHintResolver::isRealClass($classFQCN)) {
                 return false;
-            }
-
-            $constructor = $reflection->getConstructor();
-            $hasReadonly = static::checkReadonlyInClass($reflection);
-
-            if ($constructor && $constructor->isPublic()) {
-                if (!static::constructorParamsMatch($constructor, $data)) {
-                    return false;
-                }
-
-                if ($hasReadonly) {
-                    return true;
-                }
             }
 
             return static::propertiesMatch($reflection, $data);
@@ -614,15 +578,15 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
 
     public static function fromSmartArray(array $data, array $renameKey = [], array $namespaces = []): object
     {
-        $className = $data[static::DTO_CLASSNAME] ?? throw new NotSupportDTOException('Missing class name');
-
-        $namespace = $namespaces[$className] ?? $namespaces[static::DTO_NS_KEY] ?? throw new NotSupportDTOException('Namespace not found for class: ' . $className);
-        $classFQCN = $namespace . '\\' . $className;
+        $classFQCN = $data[static::DTO_CLASSNAME] ?? throw new NotSupportDTOException('Missing class name');
+        if (!class_exists($classFQCN)) {
+            $namespace = $namespaces[$classFQCN] ?? $namespaces[static::DTO_NS_KEY]
+                                                    ?? throw new NotSupportDTOException('Namespace not found for class: ' . $classFQCN);
+            $classFQCN = $namespace . '\\' . $classFQCN;
+        }
         if (!class_exists($classFQCN)) throw new NotSupportDTOException('Class not exist: ' . $classFQCN);
 
         unset($data[static::DTO_CLASSNAME]);
         return static::fromArray($classFQCN, $data, $renameKey, namespaces: $namespaces);
     }
-
-
 }

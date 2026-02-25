@@ -8,6 +8,8 @@ use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 
+use function time;
+
 class ArrayConstructibleTraitTest extends TestCase
 {
     /**
@@ -15,7 +17,7 @@ class ArrayConstructibleTraitTest extends TestCase
      */
     public function testFromArrayCreatesValidInstance()
     {
-        $data = ['name' => 'John Doe', 'email' => 'john.doe@example.com'];
+        $data = ['name' => 'John Doe', 'email' => 'john.doe@example.com', 'currentTime' => time()];
         $userDto = UserDto::fromArray($data);
 
         $this->assertInstanceOf(UserDto::class, $userDto);
@@ -39,7 +41,7 @@ class ArrayConstructibleTraitTest extends TestCase
      */
     public function testFromArrayWithRenamedKeys()
     {
-        $data = ['full_name' => 'John Doe', 'contact_email' => 'john.doe@example.com'];
+        $data = ['full_name' => 'John Doe', 'contact_email' => 'john.doe@example.com', 'currentTime' => time()];
         $renameKey = ['name' => 'full_name', 'email' => 'contact_email'];
 
         $userDto = UserDto::fromArray($data, $renameKey);

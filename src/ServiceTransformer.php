@@ -11,12 +11,13 @@ class ServiceTransformer extends DTOTransformer
      * @param array $data
      * @param array $renameKey
      * @param array $namespaces
+     * @return object
      * @throws ReflectionException
      */
     public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object
     {
         $classFQCN = $data['$classFQCN'] ?? $classFQCN;
-        return static::transformFromArray($classFQCN, $data, $renameKey);
+        return static::transformFromArray($classFQCN, $data, $renameKey, $namespaces);
     }
 
     public static function isSupportClass(string $classFQCN): bool
@@ -24,9 +25,9 @@ class ServiceTransformer extends DTOTransformer
         return true;
     }
 
-    public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = true): array
+    public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = true, bool $publicOnly = true): array
     {
-        $array = parent::toArray($dto, $renameKey);
+        $array = parent::toArray($dto, $renameKey, $asSmartArray, $publicOnly);
         $array['$classFQCN'] = $dto::class;
         return $array;
     }

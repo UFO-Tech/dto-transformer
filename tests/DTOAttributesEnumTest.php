@@ -20,6 +20,8 @@ use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 use Ufo\DTO\Tests\Fixtures\DTO\ValidDTO;
 use Ufo\DTO\Tests\Fixtures\UpperTransformer;
 
+use function time;
+
 class DTOAttributesEnumTest extends TestCase
 {
     public function testCases(): void
@@ -29,7 +31,12 @@ class DTOAttributesEnumTest extends TestCase
         $method = new ReflectionMethod(self::class, 'getMemberDto');
         $attribute = $method->getAttributes()[0];
 
-        $result = DTOAttributesEnum::tryFromAttr($attribute, ["name" => 'ok', 'email' => 'q'], $property, DTOTransformer::class);
+        $result = DTOAttributesEnum::tryFromAttr(
+            $attribute,
+            ["name" => 'ok', 'email' => 'q', 'currentTime' => time()],
+            $property,
+            DTOTransformer::class
+        );
         $this->assertSame('ok', $result->name);
     }
 
@@ -51,7 +58,7 @@ class DTOAttributesEnumTest extends TestCase
         $attribute = $method->getAttributes()[0];
 
         $data =
-            ['name' => 'testName1', 'email' => 'testEmail1']
+            ['name' => 'testName1', 'email' => 'testEmail1', 'currentTime' => time()]
         ;
 
         $user = DTOAttributesEnum::tryFromAttr($attribute, $data, $property, DTOTransformer::class);
@@ -68,8 +75,8 @@ class DTOAttributesEnumTest extends TestCase
         $attribute = $method->getAttributes()[0];
 
         $data = [
-            ['name' => 'testName1', 'email' => 'testEmail1'],
-            ['name' => 'testName2', 'email' => 'testEmail2'],
+            ['name' => 'testName1', 'email' => 'testEmail1', 'currentTime' => time()],
+            ['name' => 'testName2', 'email' => 'testEmail2', 'currentTime' => time()],
         ];
 
         $result = DTOAttributesEnum::tryFromAttr($attribute, $data, $property, DTOTransformer::class);
