@@ -7,7 +7,7 @@ use phpDocumentor\Reflection\TypeResolver;
 use phpDocumentor\Reflection\Types;
 use phpDocumentor\Reflection\Types\ContextFactory;
 use ReflectionException;
-
+use ReflectionNamedType;
 use Ufo\DTO\DTOTransformer;
 use function array_map;
 use function class_exists;
@@ -17,7 +17,14 @@ use function enum_exists;
 use function implode;
 use function in_array;
 use function is_array;
+use function is_bool;
+use function is_callable;
+use function is_float;
+use function is_int;
+use function is_iterable;
 use function is_null;
+use function is_object;
+use function is_string;
 use function iterator_to_array;
 use function ltrim;
 use function method_exists;
@@ -48,6 +55,10 @@ enum TypeHintResolver: string
     case FALSE = 'false';
     case DBL = 'dbl';
     case DOUBLE = 'double';
+    case CALLABLE = 'callable';
+    case ITERABLE = 'iterable';
+
+
     const string TYPE = 'type';
     const string ITEMS = 'items';
     const string ONE_OFF = 'oneOf';
@@ -366,4 +377,19 @@ enum TypeHintResolver: string
         $call($schema, $parentShema);
     }
 
+    public function matchType(mixed $value): bool
+    {
+        return match ($this) {
+            self::INT => is_int($value),
+            self::FLOAT => is_float($value),
+            self::STRING => is_string($value),
+            self::BOOL => is_bool($value),
+            self::ARRAY => is_array($value),
+            self::OBJECT => is_object($value),
+            self::CALLABLE => is_callable($value),
+            self::ITERABLE => is_iterable($value),
+            self::MIXED => true,
+            default => false,
+        };
+    }
 }

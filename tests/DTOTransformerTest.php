@@ -7,13 +7,13 @@ namespace Ufo\DTO\Tests;
 use PHPUnit\Framework\TestCase;
 use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
-use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Tests\Fixtures\DTO\AliasDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ItemDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\MemberWithFriendsWithKeysDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithArrayDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithMixedDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\ObjectWithUnionTypeDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UnionWithScalarDTO;
 use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
@@ -272,6 +272,22 @@ final class DTOTransformerTest extends TestCase
         $this->assertInstanceOf(DummyDTO::class, $dto->value2);
         $this->assertSame(5, $dto->value2->id);
         $this->assertSame(1, $dto->value3);
+    }
+
+    public function testMixedSetter()
+    {
+        $dto1 = DTOTransformer::fromArray(ObjectWithMixedDTO::class, [
+            'default' => 1,
+        ]);
+        $dto2 = DTOTransformer::fromArray(ObjectWithMixedDTO::class, [
+            'default' => '1',
+        ]);
+        $dto3 = DTOTransformer::fromArray(ObjectWithMixedDTO::class, [
+            'default' => [1,2,3],
+        ]);
+        $this->assertSame(1, $dto1->default);
+        $this->assertSame('1', $dto2->default);
+        $this->assertSame([1,2,3], $dto3->default);
     }
 
     public function testValue2AcceptsRawArray(): void
