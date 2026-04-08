@@ -1,6 +1,6 @@
 {
     "name": "ufo-tech/dto-transformer",
-    "version": "2.1.0",
+    "version": "2.1.1",
     "description": "The library provides tools for two-way transformation of DTO objects ⇄ arrays, respecting typing, contracts, and flexible transformation logic.",
     "license": "MIT",
     "authors": [

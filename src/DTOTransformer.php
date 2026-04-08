@@ -402,7 +402,11 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             return static::tryTransformToMatchingClass($type->getName(), $value);
         }
 
-        if ($type instanceof ReflectionNamedType && $type->getName() === TypeHintResolver::ARRAY->value) {
+        if ($type instanceof ReflectionNamedType
+            && (
+                $type->getName() === TypeHintResolver::ARRAY->value
+                || $type->getName() === TypeHintResolver::MIXED->value
+            )) {
             return $value;
         }
 
@@ -472,13 +476,13 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
     {
         if (is_subclass_of($enumFQCN, BackedEnum::class)) {
             return $enumFQCN::tryFrom($value)
-               ?? throw new BadParamException(
-                sprintf(
-                    'Invalid value "%s" for enum %s',
-                    $value,
-                    $enumFQCN
-                )
-            );
+                   ?? throw new BadParamException(
+                    sprintf(
+                        'Invalid value "%s" for enum %s',
+                        $value,
+                        $enumFQCN
+                    )
+                );
         }
 
         foreach ($enumFQCN::cases() as $case) {
