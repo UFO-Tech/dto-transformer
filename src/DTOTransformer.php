@@ -142,6 +142,7 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
                     paramsDocTypes: $paramsDocTypes
                 )),
                 renameKey: $renameKey,
+                refClass: $reflectionClass
             );
         }
 
@@ -154,8 +155,17 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         array $data,
         callable $process,
         array $renameKey = [],
+        ?ReflectionClass $refClass = null,
     ): void
     {
+        if ($param->getAttributes(Ignore::class, ReflectionAttribute::IS_INSTANCEOF)) {
+            try {
+                $name = $param->getName();
+                $data[$name] = static::getPropertyValue($name, $param, $refClass ?? $param->getDeclaringClass());
+            } catch (\Throwable $e) {
+                return;
+            }
+        };
         $keys = static::getPropertyKey($param, $renameKey);
         $attr = $param->getAttributes(AttrAssertions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
         if ($attr) {
@@ -184,13 +194,21 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
         array $namespaces = [],
         array $classes = [],
         array $paramsDocTypes = []
-    ): mixed {
+    ): mixed
+    {
         if (array_key_exists($key, $data)) {
             return static::checkAttributes(
                 $ref, $data[$key], namespaces: $namespaces, classes: $classes, paramsDocTypes: $paramsDocTypes
             );
         }
+        return static::getPropertyValue($key, $ref, $refClass);
+    }
 
+    protected static function getPropertyValue(
+        string $key,
+        ReflectionParameter|ReflectionProperty $ref,
+        ReflectionClass $refClass
+    ) {
         return match (true) {
             $ref instanceof ReflectionParameter => $ref->isOptional()
                 ? $ref->getDefaultValue()
@@ -205,11 +223,16 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
                         $constructor = $refClass->getConstructor();
 
                         if ($constructor !== null) {
+                            $init = false;
+                            $value = null;
                             foreach ($constructor->getParameters() as $p) {
-                                if ($p->getName() === $key && $p->isOptional()) {
-                                    return $p->getDefaultValue();
+                                if ($init = $p->getName() === $key && $p->isOptional()) {
+                                    $value = $p->getDefaultValue();
+                                    break;
                                 }
                             }
+                            if ($init && static::canAssignToParameter($value, $ref)) return $value;
+
                         }
                     }
                     throw new InvalidArgumentException("Missing required key for property: '$key'");
@@ -219,6 +242,24 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
             default => throw new InvalidArgumentException('Unsupported reflection type'),
         };
     }
+
+    protected static function canAssignToParameter(mixed $value, ReflectionParameter|ReflectionProperty $parameter): bool
+    {
+        $type = $parameter->getType();
+
+        if ($type === null) return true;
+        if ($value === null) return $type->allowsNull();
+
+        if ($type instanceof ReflectionUnionType) {
+            foreach ($type->getTypes() as $innerType) {
+                if (TypeHintResolver::tryFrom($innerType->getName())->matchType($value) ?? false) return true;
+            }
+            return false;
+        }
+
+        return TypeHintResolver::tryFrom($type->getName())->matchType($value) ?? false;
+    }
+
 
     protected static function getClassUses(ReflectionClass $refClass): array
     {
@@ -563,9 +604,9 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
     {
         $dtoKey = $property->getName();
         $dataKey = array_key_exists($dtoKey, $renameKey) ? $renameKey[$dtoKey] : $dtoKey;
-        if ($property->getAttributes(Ignore::class)[0] ?? null) {
-            $dataKey = null;
-        }
+//        if ($property->getAttributes(Ignore::class)[0] ?? null) {
+//            $dataKey = null;
+//        }
         return new TransformKeyVO($dtoKey, $dataKey);
     }
 
