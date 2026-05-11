@@ -4,6 +4,7 @@ namespace Ufo\DTO;
 
 
 use Ufo\DTO\Exceptions\BadParamException;
+use Ufo\DTO\Exceptions\NotInitializeException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
@@ -15,6 +16,7 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
 
     /**
      *  default namespace for DTO
+     * @tag
      */
     const string DTO_NS_KEY = '$defaultNamespace';
 
@@ -69,7 +71,7 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
      * @param array<string, string> $badParams
      * @return string
      */
-    private static function formatClassErrors(array $badParams = []): string
+    protected static function formatClassErrors(array $badParams = []): string
     {
         $lines = [];
         foreach ($badParams as $class => $msg) {
@@ -90,11 +92,13 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
             } catch (NotSupportDTOException) {
                 return static::transformFromArray($classFQCN, $data, $renameKey, namespaces: $namespaces);
             }
+        } catch (NotInitializeException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             throw new BadParamException($e->getMessage(), $e->getCode(), $e);
         }
     }
 
-    abstract protected static function transformFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object;
+    abstract public static function transformFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object;
 
 }

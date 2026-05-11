@@ -7,7 +7,9 @@ use phpDocumentor\Reflection\TypeResolver;
 use phpDocumentor\Reflection\Types;
 use phpDocumentor\Reflection\Types\ContextFactory;
 use ReflectionException;
-
+use ReflectionNamedType;
+use ReflectionType;
+use ReflectionUnionType;
 use Ufo\DTO\DTOTransformer;
 use function array_map;
 use function class_exists;
@@ -17,7 +19,14 @@ use function enum_exists;
 use function implode;
 use function in_array;
 use function is_array;
+use function is_bool;
+use function is_callable;
+use function is_float;
+use function is_int;
+use function is_iterable;
 use function is_null;
+use function is_object;
+use function is_string;
 use function iterator_to_array;
 use function ltrim;
 use function method_exists;
@@ -48,6 +57,10 @@ enum TypeHintResolver: string
     case FALSE = 'false';
     case DBL = 'dbl';
     case DOUBLE = 'double';
+    case CALLABLE = 'callable';
+    case ITERABLE = 'iterable';
+
+
     const string TYPE = 'type';
     const string ITEMS = 'items';
     const string ONE_OFF = 'oneOf';
@@ -97,7 +110,7 @@ enum TypeHintResolver: string
                 $types = array_map(fn($t) => TypeHintResolver::jsonSchemaToPhp($t, $namespaces), $type[self::ONE_OFF]);
 
                 if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
-                    $type = '?' . current(array_filter($types, fn($t) => $t !== self::NULL->value));
+                    $type = self::NULL->value . '|' . current(array_filter($types, fn($t) => $t !== self::NULL->value));
                 } else {
                     $type = implode('|', array_unique($types));
                 }
@@ -182,9 +195,105 @@ enum TypeHintResolver: string
     }
 
     /**
+     * @param array<string, string> $namespaces
      * @throws ReflectionException
      */
-    private static function typeToSchema(Type $type, array $classes = []): array
+    public static function reflectionTypeToSchema(?ReflectionType $type, array $namespaces = []): array
+    {
+        $schema = [];
+        if ($type instanceof ReflectionUnionType) {
+            $schema = [
+                self::ONE_OFF => array_map(
+                    fn (ReflectionType $subType): array => self::reflectionTypeToSchema($subType, $namespaces),
+                    $type->getTypes(),
+                ),
+            ];
+        }
+
+        if ($type instanceof ReflectionNamedType) {
+            $schema = self::reflectionNamedTypeToSchema($type, $namespaces);
+
+            if ($type->allowsNull() && $type->getName() !== self::NULL->value) {
+                $schema = [
+                    self::ONE_OFF => [
+                        $schema,
+                        [self::TYPE => self::NULL->value],
+                    ],
+                ];
+            }
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @param array<string, string> $namespaces
+     * @throws ReflectionException
+     */
+    public static function reflectionNamedTypeToSchema(ReflectionNamedType $type, array $namespaces = []): array
+    {
+        $typeName = $type->getName();
+
+        if (self::isEnum($typeName)) {
+            return EnumResolver::generateEnumSchema($typeName);
+        }
+
+        if (self::isRealClass($typeName)) {
+            return [
+                self::TYPE => self::OBJECT->value,
+                self::ADDITIONAL_PROPERTIES => true,
+                self::CLASS_FQCN => $typeName,
+            ];
+        }
+
+        if ($typeName === self::MIXED->value) {
+            return [self::ONE_OFF => self::mixedForJsonSchema()];
+        }
+
+        if ($typeName === self::NULL->value) {
+            return [self::TYPE => self::NULL->value];
+        }
+
+        $normalizedType = self::normalize($typeName);
+
+        if ($normalizedType === self::OBJECT->value) {
+            $classFQCN = self::typeWithNamespaceOrDefault(
+                $typeName,
+                $namespaces,
+                DTOTransformer::DTO_NS_KEY,
+            );
+
+            if ($classFQCN !== null) {
+                return [
+                    self::TYPE => self::OBJECT->value,
+                    self::ADDITIONAL_PROPERTIES => true,
+                    self::CLASS_FQCN => $classFQCN,
+                ];
+            }
+        }
+
+        return [self::TYPE => self::phpToJsonSchema($normalizedType)];
+    }
+
+    public static function reflectionTypeAllowsArray(?ReflectionType $type): bool
+    {
+        if ($type instanceof ReflectionUnionType) {
+            foreach ($type->getTypes() as $subType) {
+                if (self::reflectionTypeAllowsArray($subType)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return $type instanceof ReflectionNamedType && $type->getName() === self::ARRAY->value;
+    }
+
+    /**
+     * @throws ReflectionException
+     */
+    protected static function typeToSchema(Type $type, array $classes = []): array
     {
         $isObject = $type instanceof Types\Object_;
         if ($type instanceof Types\Array_) {
@@ -273,7 +382,7 @@ enum TypeHintResolver: string
             $types = array_map(fn($type) => self::jsonSchemaToTypeDescription($type, $namespaces), $schema[self::ONE_OFF]);
 
             if (count($types) === 2 && in_array(self::NULL->value, $types, true)) {
-                return '?' . current(array_filter($types, fn($type) => $type !== self::NULL->value));
+                return self::NULL->value . '|' . current(array_filter($types, fn($type) => $type !== self::NULL->value));
             } else {
                 return implode('|', $types);
             }
@@ -366,4 +475,19 @@ enum TypeHintResolver: string
         $call($schema, $parentShema);
     }
 
+    public function matchType(mixed $value): bool
+    {
+        return match ($this) {
+            self::INT => is_int($value),
+            self::FLOAT => is_float($value),
+            self::STRING => is_string($value),
+            self::BOOL => is_bool($value),
+            self::ARRAY => is_array($value),
+            self::OBJECT => is_object($value),
+            self::CALLABLE => is_callable($value),
+            self::ITERABLE => is_iterable($value),
+            self::MIXED => true,
+            default => false,
+        };
+    }
 }

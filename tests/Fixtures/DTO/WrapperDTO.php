@@ -9,15 +9,16 @@ use Ufo\DTO\ArrayConvertibleTrait;
 use Ufo\DTO\Attributes\AttrDTO;
 use Ufo\DTO\Interfaces\IArrayConstructible;
 use Ufo\DTO\Interfaces\IArrayConvertible;
+use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 
 class WrapperDTO  implements IArrayConstructible, IArrayConvertible
 {
     use ArrayConstructibleTrait, ArrayConvertibleTrait;
 
+    /**
+     * @param DummyDTO|DummyDTO[] $items
+     */
     public function __construct(
-        #[AttrDTO(dtoFQCN: DummyDTO::class, context: [
-            AttrDTO::C_COLLECTION => true
-        ])]
         public DummyDTO|array $items
     ) {}
 }
