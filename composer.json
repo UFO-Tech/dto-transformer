@@ -48,13 +48,21 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "Ufo\\DTO\\Tests\\": "tests/"
+            "Ufo\\DTO\\Tests\\": "tests/",
+            "Ufo\\DTO\\Benchmarks\\": "benchmarks/"
         }
     },
     "extra": {
     },
+    "archive": {
+        "exclude": [
+            "/benchmarks",
+            "/tests"
+        ]
+    },
     "scripts": {
-        "test": "phpunit"
+        "test": "phpunit",
+        "bench": "XDEBUG_MODE=off php benchmarks/run.php"
     }
   
 }
