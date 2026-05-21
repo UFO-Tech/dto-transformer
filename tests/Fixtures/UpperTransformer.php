@@ -7,7 +7,7 @@ use Ufo\DTO\Tests\Fixtures\DTO\ValidDTO;
 
 class UpperTransformer implements IDTOFromArrayTransformer
 {
-    public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object
+    public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object
     {
         return new ValidDTO(strtoupper($data['name']));
     }

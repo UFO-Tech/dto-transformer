@@ -12,12 +12,12 @@ trait ArrayConstructibleTrait
      * @throws BadParamException
      * @throws NotSupportDTOException
      */
-    public static function fromArray(array $data, array $renameKey = []): static
+    public static function fromArray(array $data, array $renameKey = [], array $context = []): static
     {
         /**
          * @var static $self
          */
-        $self = DTOTransformer::fromArray(static::class, $data, $renameKey);
+        $self = DTOTransformer::fromArray(static::class, $data, $renameKey, context: $context);
         return $self;
     }
 }

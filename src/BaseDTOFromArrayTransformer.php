@@ -4,17 +4,18 @@ namespace Ufo\DTO;
 
 
 use Ufo\DTO\Exceptions\BadParamException;
+use Ufo\DTO\Exceptions\NotInitializeException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
 use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
-use Ufo\DTO\Interfaces\IDTOFromSmartArrayTransformer;
 
-abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, IDTOFromSmartArrayTransformer
+abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer
 {
     const string DTO_CLASSNAME = '$className';
 
     /**
      *  default namespace for DTO
+     * @tag
      */
     const string DTO_NS_KEY = '$defaultNamespace';
 
@@ -27,7 +28,7 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
      * @param array<string, string> $namespaces
      * @return object
      */
-    public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object
+    public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object
     {
         $classes = explode('|', $classFQCN);
 
@@ -42,7 +43,7 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
                         static::DTO_NS_KEY
                     ) ?? throw new NotSupportDTOException('Invalid class FQCN: ' . $class);
                 }
-                return static::singleFromArray($class, $data, $renameKey, $namespaces);
+                return static::singleFromArray($class, $data, $renameKey, $namespaces, $context);
             } catch (NotSupportDTOException|BadParamException $e) {
                 if (count($classes) === 1) throw $e;
 
@@ -69,7 +70,7 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
      * @param array<string, string> $badParams
      * @return string
      */
-    private static function formatClassErrors(array $badParams = []): string
+    protected static function formatClassErrors(array $badParams = []): string
     {
         $lines = [];
         foreach ($badParams as $class => $msg) {
@@ -79,22 +80,20 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer, 
         return PHP_EOL . implode(PHP_EOL, $lines);
     }
 
-    protected static function singleFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object
+    protected static function singleFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object
     {
         if (!static::isSupportClass($classFQCN)) {
             throw new NotSupportDTOException(static::class . ' is not support transform for ' . $classFQCN);
         }
         try {
-            try {
-                return static::fromSmartArray($data, $renameKey, namespaces: $namespaces);
-            } catch (NotSupportDTOException) {
-                return static::transformFromArray($classFQCN, $data, $renameKey, namespaces: $namespaces);
-            }
+            return static::transformFromArray($classFQCN, $data, $renameKey, namespaces: $namespaces, context: $context);
+        } catch (NotInitializeException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             throw new BadParamException($e->getMessage(), $e->getCode(), $e);
         }
     }
 
-    abstract protected static function transformFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = []): object;
+    abstract public static function transformFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object;
 
 }

@@ -13,7 +13,7 @@ class ValidDTO implements IArrayConstructible
     use ArrayConstructibleTrait;
 
     public function __construct(
-        #[AttrAssertions([new NotBlank(), new Length(['min' => 3])])]
+        #[AttrAssertions([new NotBlank(), new Length(min: 3)])]
         public string $name
     ) {}
 

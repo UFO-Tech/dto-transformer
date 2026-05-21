@@ -64,6 +64,7 @@ enum EnumResolver:string
 
         return [
             T::TYPE => $jsonType,
+            T::CLASS_FQCN => $enumFQCN,
             self::ENUM => [
                 self::ENUM_NAME => $refEnum->getShortName(),
                 self::METHOD_VALUES => $data,

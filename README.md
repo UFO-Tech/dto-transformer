@@ -1,294 +1,546 @@
-## 🧩 **ufo/dto-transformer**
+# DTO Transformer
 
-A PHP library that provides tools for **bidirectional transformation between DTO objects ⇄ arrays**, with full type safety, contracts, and flexible conversion logic. Ideal for JSON-RPC, REST APIs, CLI tools, and any context where data is passed as arrays.
+`ufo-tech/dto-transformer` is a PHP 8.3+ library for converting DTO objects to arrays and hydrating DTO objects from arrays.
 
----
+The current implementation is built around replaceable services:
 
-## 📦 Core Components:
+- `DTOTransformer` is the main facade/service.
+- `DTOFromArrayTransformer` hydrates arrays into DTO objects.
+- `DTOToArrayTransformer` normalizes DTO objects into arrays.
+- `ParamHydratorInterface` implementations resolve typed values during hydration.
+- `PropertyNormalizerInterface` implementations normalize values during serialization.
+- Reflection metadata, DocBlocks, strict mode and type schemas are centralized and cacheable.
 
-### 🔁 `DTOTransformer`
+## Installation
 
-Central service for:
+```bash
+composer require ufo-tech/dto-transformer
+```
 
-* transforming arrays into DTOs via `fromArray(...)`;
-* serializing DTOs to arrays via `toArray(...)`.
+Requirements:
 
-### ⚙️ `IDTOFromArrayTransformer` + `IDTOToArrayTransformer`
+- PHP `>=8.3`
+- `ext-intl`
+- `symfony/serializer`
+- `symfony/validator`
+- `symfony/cache-contracts`
+- `phpdocumentor/reflection-docblock`
+- `phpdocumentor/type-resolver`
 
-Interfaces for custom transformers that encapsulate specific logic for unpacking/packing particular DTOs.
+## Quick Start
 
-### 🧱 `BaseDTOFromArrayTransformer`
+```php
+use Ufo\DTO\Factory\DefaultDTOTransformerFactory;
 
-Base class with a default `fromArray()` implementation that includes:
+final class UserDto
+{
+    public function __construct(
+        public string $name,
+        public string $email,
+    ) {}
+}
 
-* support check via `supportsClass(...)`;
-* key renaming and data normalization;
-* constructor argument resolution and instantiation.
+$transformer = DefaultDTOTransformerFactory::default()->create();
 
-### 🚨 `NotSupportDTOException`
+$user = $transformer->transformFromArray(UserDto::class, [
+    'name' => 'Alex',
+    'email' => 'alex@example.com',
+]);
 
-Thrown when a transformer does not support the provided DTO class.
+$array = $transformer->transformToArray($user);
+```
 
----
+Static calls are still supported, but the transformer must be booted first:
 
-## 🧬 Contracts & Traits:
+```php
+use Ufo\DTO\DTOTransformer;
+use Ufo\DTO\Factory\DefaultDTOTransformerFactory;
 
-### `IArrayConstructible` + `ArrayConstructibleTrait`
+DTOTransformer::boot(DefaultDTOTransformerFactory::default()->create());
 
-For DTO classes that support construction from arrays:
+$dto = DTOTransformer::fromArray(UserDto::class, $payload);
+$array = DTOTransformer::toArray($dto);
+```
 
-* Maps constructor arguments automatically;
-* Works via `ReflectionParameter`.
+If the static facade is used before `DTOTransformer::boot()`, `NotInitializeException` is thrown.
 
-### `IArrayConvertible` + `ArrayConvertibleTrait`
+## Default Factories
 
-For DTO classes that can be serialized to arrays:
+Use `DefaultDTOTransformerFactory::default()` for the standard composition:
 
-* Automatically serializes public and readonly properties;
-* Supports field aliasing and `#[DTOAttributesEnum::Hidden]`.
+```php
+use Symfony\Component\Cache\Adapter\FilesystemAdapter;
+use Ufo\DTO\Factory\DefaultDTOTransformerFactory;
 
----
+$cache = new FilesystemAdapter(namespace: 'dto_transformer');
 
-## 🔌 Usage Example:
+$transformer = DefaultDTOTransformerFactory::default(
+    persistentCache: $cache,
+)->create();
+```
+
+The default factory wires:
+
+- `RuntimeReflectionCache`
+- `ReflectionMetadataProvider`
+- `StrictModeResolver`
+- `ReflectionTypeSchemaResolver`
+- `DefaultDTOTransformerFromArrayFactory`
+- `DefaultDTOTransformerToArrayFactory`
+- `DefaultPropertyNormalizerFactory`
+
+For custom wiring, instantiate `DefaultDTOTransformerFactory` with your own `DTOTransformerFromArrayFactoryInterface` and `DTOTransformerToArrayFactoryInterface` implementations.
+
+## Object To Array
+
+```php
+$array = $transformer->transformToArray(
+    dto: $dto,
+    renameKey: ['name' => 'full_name'],
+    asSmartArray: false,
+    publicOnly: true,
+    context: [],
+);
+```
+
+The default normalizer chain is created by `DefaultPropertyNormalizerFactory`:
+
+```php
+new PropertyNormalizer([
+    new ScalarValueConverter(),
+    new EnumNormalizer(),
+    new DateTimeNormalizer($dateTimeValueConverter),
+    new ArrayNormalizer(),
+    new DtoNormalizer($metadataProvider, $serializationContextProvider),
+]);
+```
+
+Normalizers implement:
+
+```php
+use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerInterface;
+use Ufo\DTO\VO\NormalizationContext;
+
+interface PropertyNormalizerInterface
+{
+    public function supports(mixed $data, NormalizationContext $context): bool;
+
+    public function normalize(mixed $data, NormalizationContext $context): mixed;
+}
+```
+
+`DtoNormalizer` reads DTO properties through metadata, applies `renameKey`, `publicOnly`, `SerializationContext`, smart-array output and recursively delegates nested values back to the chain.
+
+### Serialization Context
+
+```php
+use DateTimeInterface;
+use Ufo\DTO\Attributes\SerializationContext;
+use Ufo\DTO\VO\NormalizationContext;
+
+final class EventDto
+{
+    public function __construct(
+        #[SerializationContext([
+            NormalizationContext::DATE_FORMAT => DateTimeInterface::ATOM,
+            NormalizationContext::DATE_TIMEZONE => 'UTC',
+        ])]
+        public DateTimeImmutable $createdAt,
+    ) {}
+}
+```
+
+Default enum output:
+
+- backed enums are normalized to their backing value;
+- unit enums are normalized to the case name.
+
+Default DateTime output format is `Y-m-d H:i:s`. Use `SerializationContext` or call-level `context` to change date format, timezone or timestamp output.
+
+## Array To Object
+
+```php
+$dto = $transformer->transformFromArray(UserDto::class, [
+    'name' => 'Alex',
+    'email' => 'alex@example.com',
+]);
+```
+
+The default hydration chain is created by `DefaultDTOTransformerFromArrayFactory` and `DefaultParamHydratorFactory`:
+
+```php
+new UnionParamHydrator();
+new EnumParamHydrator();
+new ScalarParamHydrator();
+new ReflectionClassHydrator();
+new ReflectionParameterHydrator();
+new ReflectionPropertyHydrator();
+new DateTimeHydrator();
+new DtoHydrator($transformer, $customTransformers);
+new ArrayItemsHydrator();
+new AdditionalHydrator();
+new MixedHydrator();
+```
+
+Hydrators implement:
+
+```php
+use Ufo\DTO\Interfaces\Hydrator\ParamHydratorInterface;
+use Ufo\DTO\VO\TransformationContext;
+
+interface ParamHydratorInterface
+{
+    public function supports(array $schema): bool;
+
+    public function resolve(
+        array $schema,
+        mixed $value,
+        TransformationContext $context,
+    ): mixed;
+}
+```
+
+`ReflectionTypeSchemaResolver` builds schemas from native PHP types, DocBlocks, `AttrDTO`, namespaces and strict-mode metadata. If no schema is available, the original value is kept.
+
+### Native Types
+
+```php
+final class ProfileDto
+{
+    public function __construct(
+        public string $name,
+        public int $age,
+        public bool $active,
+    ) {}
+}
+```
+
+### Nested DTOs
+
+```php
+final class OrderDto
+{
+    public function __construct(
+        public UserDto $user,
+    ) {}
+}
+
+$order = DTOTransformer::fromArray(OrderDto::class, [
+    'user' => [
+        'name' => 'Alex',
+        'email' => 'alex@example.com',
+    ],
+]);
+```
+
+### Collections
+
+Collections can be described with DocBlocks:
+
+```php
+final class TeamDto
+{
+    /**
+     * @param UserDto[] $users
+     */
+    public function __construct(
+        public array $users,
+    ) {}
+}
+```
+
+Or with `AttrDTO`:
 
 ```php
 use Ufo\DTO\Attributes\AttrDTO;
 
-class UserDto implements IArrayConstructible, IArrayConvertible
+final class TeamDto
 {
-    use ArrayConstructibleTrait;
-    use ArrayConvertibleTrait;
-    
-    public readonly $randomNumber;
-
     public function __construct(
-        public string $name,
-        public string $email,
-    ) 
-    {
-        $this->randomNumber = rand(1, 100);   
-    }
-}
-
-class MemberWithFriendsDTO implements IArrayConstructible, IArrayConvertible
-{
-    use ArrayConstructibleTrait;
-    use ArrayConvertibleTrait;
-
-    public function __construct(
-        public User $user
-        #[AttrDTO(User::class, context: [
+        #[AttrDTO(UserDto::class, context: [
             AttrDTO::C_COLLECTION => true,
-            AttrDTO::C_RENAME_KEYS => ['randomNumber' => null]
         ])]
-        public array $friends
+        public array $users,
     ) {}
 }
-
-$data = [
-    'user' => [
-        'name' => 'Alex',
-        'email' => 'alex@site.com',
-        'randomNumber' => 99,
-    ],
-    'friends' => [
-        [
-            'name' => 'Ivan',
-            'email' => 'ivan@site.com',
-            'randomNumber' => 23,
-        ],
-        [
-            'name' => 'Peter',
-            'email' => 'peter@site.com',
-            'randomNumber' => 14,
-        ]
-    ]
-];
-
-$dto = DTOTransformer::fromArray(MemberWithFriendsDTO::class, $data);
-var_dump($dto);
-//object(MemberWithFriendsDTO)#...
-//  public $user =>
-//    object(User)#...
-//      public $name => "Alex"
-//      public $email => "alex@site.com"
-//      public $randomNumber => 12
-//
-//  public $friends =>
-//    array(2) {
-//      [0] =>
-//        object(User)#...
-//          public $name => "Ivan"
-//          public $email => "ivan@site.com"
-//          public $randomNumber => 23
-//      [1] =>
-//        object(User)#...
-//          public $name => "Peter"
-//          public $email => "peter@site.com"
-//          public $randomNumber => 11
-//    }
-
-$data = DTOTransformer::toArray($dto); 
-//[
-//    'user' => [
-//        'name' => 'Alex',
-//        'email' => 'alex@site.com',
-//        'randomNumber' => 12,
-//    ],
-//    'friends' => [
-//        [
-//            'name' => 'Ivan',
-//            'email' => 'ivan@site.com',
-//            'randomNumber' => 23,
-//        ],
-//        [
-//            'name' => 'Peter',
-//            'email' => 'peter@site.com',
-//            'randomNumber' => 11,
-//        ]
-//    ]
-//];
 ```
 
+### Smart Arrays
 
-# 📖 DocBlock Support
-
-The library supports reading DocBlock annotations for constructors and public DTO properties.  
-This makes it possible to accurately detect expected types even if they are not explicitly declared in the signature.
+Smart arrays include the DTO class name in the payload:
 
 ```php
-    use Ufo\DTO\Tests\Fixtures\Enum\IntEnum;
+$array = DTOTransformer::toArray($dto, asSmartArray: true);
 
-    class DocblockDTO
-    {
-        /**
-         * @var array<UserDto|DummyDTO>
-         */
-        public array $formatedCollection = [];
-    
-        /**
-         * @param array<UserDto|DummyDTO|IntEnum> $collection
-         */
-        public function __construct(
-            public string $name,
-            public array $collection
-        ) {}
-    }
+// [
+//     'name' => 'Alex',
+//     '$className' => App\Dto\UserDto::class,
+// ]
 ```
 
-🔍 How it works 
-- @var and @param annotations are parsed automatically. 
-- The library detects union types (UserDto|DummyDTO|IntEnum) and builds the correct collection.
-- Supported types:
-  - DTO classes (e.g., UserDto, DummyDTO)
-  - Enums (e.g., IntEnum)
-  - Mixed-type arrays
-
-🚀 Example
-
-When calling DocblockDTO::fromArray($data), the library will automatically:
-1.	Convert array elements into the correct DTO or enum.
-2.	Ensure type safety according to the DocBlock.
-3.	Build a fully initialized object with collections of the required types.
-
-
----
-
-## 🔧 Custom Transformer Example
-
-This is a sample **custom transformer** implementing `IDTOFromArrayTransformer` for transforming an `OrderDTO` where `amount` must be cast to float and `createdAt` to `DateTimeImmutable`.
+They can be restored with namespace aliases:
 
 ```php
-use Ufo\RpcObject\DTO\IDTOFromArrayTransformer;
-use Ufo\RpcObject\DTO\DTOTransformer;
+$dto = DTOTransformer::fromSmartArray($array, namespaces: [
+    DTOTransformer::DTO_NS_KEY => App\Dto::class,
+]);
+```
 
-class OrderDTO
+### DateTime
+
+Hydration supports `DateTimeImmutable`, `DateTime`, `DateTimeInterface`, strings, integer timestamps and float timestamps with microseconds.
+
+```php
+final class EventDto
 {
     public function __construct(
-        public int $id,
-        public float $amount,
         public DateTimeImmutable $createdAt,
     ) {}
 }
 
-final class OrderTransformer implements IDTOFromArrayTransformer
+$dto = DTOTransformer::fromArray(EventDto::class, [
+    'createdAt' => '2026-05-08 14:30:00',
+]);
+```
+
+### Enums
+
+Backed enums use `tryFrom()`. Integer-backed enums also accept numeric strings. Unit enums are resolved by case name, case-insensitively.
+
+```php
+enum Status: string
 {
-    public static function fromArray(
-        string $classFQCN,
-        array $data,
-        array $renameKey = []
-    ): object {
-        $data['amount'] = (float) $data['amount'];
-        $data['createdAt'] = new DateTimeImmutable($data['createdAt']);
+    case Active = 'active';
+}
 
-        return DTOTransformer::fromArray($classFQCN, $data, $renameKey);
-    }
-
-    public static function supportsClass(string $classFQCN): bool
-    {
-        return is_a($classFQCN, OrderDTO::class, true);
-    }
+final class UserDto
+{
+    public function __construct(
+        public Status $status,
+    ) {}
 }
 ```
 
----
+## Attributes
 
-### 🧩 With attribute-based transformer:
+### `AttrDTO`
+
+`AttrDTO` gives explicit denormalization hints:
 
 ```php
 use Ufo\DTO\Attributes\AttrDTO;
 
-class MemberWithOrdersDTO implements IArrayConstructible, IArrayConvertible
+final class WrapperDto
 {
-    use ArrayConstructibleTrait;
-    use ArrayConvertibleTrait;
-
     public function __construct(
-        public User $user,
-        #[AttrDTO(Order::class, context: [
+        #[AttrDTO(UserDto::class, context: [
             AttrDTO::C_COLLECTION => true,
-            AttrDTO::C_TRANSFORMER => OrderTransformer::class
+            AttrDTO::C_STRICT => true,
         ])]
-        public array $orders
+        public array $users,
     ) {}
 }
-
-$data = [
-    'user' => [
-        'name' => 'Alex',
-        'email' => 'alex@site.com',
-    ],
-    "orders" => [
-        [
-            'id' => 101,
-            'amount' => '199.90',
-            'createdAt' => '2025-05-09T20:00:00+03:00'
-        ],
-        [
-            'id' => 102,
-            'amount' => '99.90',
-            'createdAt' => '2025-05-08T12:20:00+03:00'
-        ]
-    ]
-];
-
-$dto = DTOTransformer::fromArray(MemberWithOrdersDTO::class, $data);
 ```
 
-This transformer:
+Supported context keys:
 
-* strictly follows `IDTOFromArrayTransformer`;
-* encapsulates complex conversion logic;
-* delegates array-to-object conversion to the core transformer.
+- `AttrDTO::C_COLLECTION`
+- `AttrDTO::C_STRICT`
+- `AttrDTO::C_NS`
+- `AttrDTO::C_RENAME_KEYS`
+- `AttrDTO::C_TRANSFORMER`
+- `AttrDTO::C_IS_ENUM`
+- `AttrDTO::C_PROPERTY`
 
----
+### `StrictMode`
 
-## 🧠 Library Advantages
+Strict mode turns hydration failures into `BadParamException`. Without strict mode, invalid nested values may be kept as-is.
 
-* Full support for PHP 8.3 type system;
-* Flexible logic via pluggable custom transformers;
-* Type-safe, self-descriptive, and composable architecture;
-* Simple attribute-based field control without code duplication;
-* Standardized DTO handling for SOA and microservices environments.
+```php
+use Ufo\DTO\Attributes\StrictMode;
 
+final class UserDto
+{
+    public function __construct(
+        #[StrictMode]
+        public int $age,
+    ) {}
+}
+```
 
+DocBlock strict mode is also supported:
+
+```php
+/**
+ * @strictMode true
+ */
+final class UserDto
+{
+}
+```
+
+## Extensibility
+
+Add custom object-to-array behavior with `PropertyNormalizerInterface`:
+
+```php
+use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerInterface;
+use Ufo\DTO\VO\NormalizationContext;
+
+final class MoneyNormalizer implements PropertyNormalizerInterface
+{
+    public function supports(mixed $data, NormalizationContext $context): bool
+    {
+        return $data instanceof Money;
+    }
+
+    public function normalize(mixed $data, NormalizationContext $context): string
+    {
+        return $data->currency . ' ' . number_format($data->amount / 100, 2);
+    }
+}
+```
+
+Add custom array-to-object behavior with `ParamHydratorInterface`:
+
+```php
+use Ufo\DTO\Interfaces\Hydrator\ParamHydratorInterface;
+use Ufo\DTO\VO\TransformationContext;
+
+final class UuidHydrator implements ParamHydratorInterface
+{
+    public function supports(array $schema): bool
+    {
+        return ($schema['format'] ?? null) === 'uuid';
+    }
+
+    public function resolve(array $schema, mixed $value, TransformationContext $context): Uuid
+    {
+        return Uuid::fromString((string) $value);
+    }
+}
+```
+
+For full control, provide your own factory implementations or construct `DTOFromArrayTransformer` / `DTOToArrayTransformer` with custom chains.
+
+## Symfony Integration
+
+Install dependencies:
+
+```bash
+composer require ufo-tech/dto-transformer
+composer require phpdocumentor/reflection-docblock
+```
+
+Configure services:
+
+```yaml
+services:
+  _defaults:
+    autowire: true
+    autoconfigure: true
+
+  _instanceof:
+    Ufo\DTO\Interfaces\Hydrator\ParamHydratorInterface:
+      tags:
+        - dto.param_hydrator
+
+    Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerInterface:
+      tags:
+        - dto.param_normalizer
+
+  Ufo\DTO\:
+    resource: '../vendor/ufo-tech/dto-transformer/src'
+    exclude:
+      - '../vendor/ufo-tech/dto-transformer/src/Annotations/'
+      - '../vendor/ufo-tech/dto-transformer/src/Attributes/'
+
+  phpDocumentor\Reflection\DocBlockFactoryInterface:
+    class: phpDocumentor\Reflection\DocBlockFactory
+    factory: [ 'phpDocumentor\Reflection\DocBlockFactory', 'createInstance' ]
+
+  Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerChainInterface:
+    class: Ufo\DTO\Transformer\Normalizer\PropertyNormalizer
+    arguments:
+      $converters: !tagged_iterator dto.param_normalizer
+
+  Ufo\DTO\Interfaces\DTOFromArrayTransformerInterface:
+    factory: [ '@Ufo\DTO\Factory\DefaultDTOTransformerFromArrayFactory', 'create' ]
+
+  Ufo\DTO\Interfaces\DTOToArrayTransformerInterface:
+    factory: [ '@Ufo\DTO\Factory\DefaultDTOTransformerToArrayFactory', 'create' ]
+
+  Ufo\DTO\DTOTransformer:
+    public: true
+    arguments:
+      $fromArrayTransformer: '@Ufo\DTO\Interfaces\DTOFromArrayTransformerInterface'
+      $toArrayTransformer: '@Ufo\DTO\Interfaces\DTOToArrayTransformerInterface'
+```
+
+`public: true` is required if the transformer is accessed through:
+
+```php
+$container->get(DTOTransformer::class)
+```
+
+or inside `Bundle::boot()`.
+
+Cache adapters are optional.
+
+```yaml
+ufo.dto.cache:
+  public: true
+  class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+  arguments:
+    $namespace: 'meta'
+    $directory: '%rpc_cache_dirrectory%/dto-transformer'
+    $defaultLifetime: '%rpc_filecache_ttl%'
+```
+
+Example:
+
+```php
+use Ufo\DTO\DTOTransformer;
+
+final class UserService
+{
+    public function __construct(
+        private readonly DTOTransformer $transformer,
+    ) {
+    }
+}
+```
+
+```php
+$user = $this->transformer->fromArray(UserDTO::class, [
+    'name' => 'Alex',
+]);
+
+$array = $this->transformer->toArray($user);
+```
+
+## Performance
+
+Recommendations:
+
+- reuse one `DTOTransformer` service instance;
+- pass a Symfony cache adapter to `DefaultDTOTransformerFactory::default()`;
+- prefer native types where possible;
+- use DocBlocks for collections and unions where native types are not enough;
+- avoid rebuilding custom hydrator or normalizer chains per request.
+
+## Testing
+
+```bash
+docker exec php_dto php vendor/bin/phpunit
+```
+
+Benchmarks:
+
+```bash
+composer bench
+```
+
+## License
+
+MIT

@@ -13,10 +13,11 @@ class AttrDTO
     const string C_COLLECTION = 'collection';
     const string C_TRANSFORMER = 'transformerFQCN';
     const string C_PROPERTY = 'property';
+    const string C_STRICT = 'strict';
 
     public function __construct(
-        public readonly string $dtoFQCN,
-        public readonly array $context = []
+        readonly public string $dtoFQCN,
+        readonly public array $context = []
     ) {}
 
     public function isEnum(): bool
@@ -27,6 +28,11 @@ class AttrDTO
     public function isCollection(): bool
     {
         return $this->context[static::C_COLLECTION] ?? false;
+    }
+
+    public function isStrict(): bool
+    {
+        return $this->context[static::C_STRICT] ?? false;
     }
 
     public function namespaces(): array
@@ -53,4 +59,5 @@ class AttrDTO
     {
         return $this->context[$key] ?? null;
     }
+
 }
