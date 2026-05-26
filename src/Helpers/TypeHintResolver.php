@@ -480,7 +480,7 @@ enum TypeHintResolver: string
         return match ($this) {
             self::NULL => is_null($value),
             self::INT => is_int($value),
-            self::FLOAT => is_float($value),
+            self::FLOAT => is_float($value) || is_int($value),
             self::STRING => is_string($value),
             self::BOOL => is_bool($value),
             self::ARRAY => is_array($value),
