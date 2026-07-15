@@ -427,6 +427,23 @@ enum TypeHintResolver: string
     {
         $class = $namespaces[$type] ?? null;
 
+        if (!$class && str_contains($type, '\\')) {
+            // Fallback for a relative type carrying intermediate namespace segments
+            // (e.g. "Enums\DeliveryCapabilityEnum" imported via `use App\SDK\Atlas\Enums;`).
+            // The use-map is keyed by a single alias segment, which may be the leading one
+            // ("use ...\Enums;") or a deeper one ("use ...\Enums\Level;"), so try each leading
+            // segment as the alias key and keep the first that expands to a real symbol.
+            $segments = explode('\\', ltrim($type, '\\'));
+            for ($i = 0, $n = count($segments); $i < $n - 1 && !$class; $i++) {
+                if ($aliasNs = ($namespaces[$segments[$i]] ?? null)) {
+                    $candidate = $aliasNs . '\\' . implode('\\', array_slice($segments, $i + 1));
+                    if (class_exists($candidate) || enum_exists($candidate) || interface_exists($candidate)) {
+                        $class = $candidate;
+                    }
+                }
+            }
+        }
+
         if (!$class) {
             $namespace = $namespaces[$defaultKey] ?? null;
             $class = !empty($namespace) ? $namespace . '\\' . $type : $type;
