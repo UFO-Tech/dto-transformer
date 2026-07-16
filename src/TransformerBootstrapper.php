@@ -34,4 +34,9 @@ final class TransformerBootstrapper
             ServiceTransformer::boot($factory->create(ServiceTransformer::class));
         }
     }
+
+    public static function isInitialized(): bool
+    {
+        return DTOTransformer::isInitialized() && ServiceTransformer::isInitialized();
+    }
 }
