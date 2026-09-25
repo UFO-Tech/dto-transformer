@@ -84,6 +84,46 @@ final class DocblockSchemaTest extends ReflectionTypeSchemaResolverTestCase
         $this->assertArrayNotHasKey(TypeHintResolver::CLASS_FQCN, $valueSchema);
     }
 
+
+    public function testListDocblockSchemaBuilds(): void
+    {
+        $schema = $this->schemaFor($this->listFixture(), 'items');
+
+        $this->assertSame(TypeHintResolver::ARRAY->value, $schema[TypeHintResolver::TYPE]);
+        $this->assertObjectSchema(DummyDTO::class, $schema[TypeHintResolver::ITEMS]);
+    }
+
+    public function testNonEmptyListDocblockSchemaBuilds(): void
+    {
+        $schema = $this->schemaFor($this->listFixture(), 'nonEmptyItems');
+
+        $this->assertSame(TypeHintResolver::ARRAY->value, $schema[TypeHintResolver::TYPE]);
+        $this->assertObjectSchema(DummyDTO::class, $schema[TypeHintResolver::ITEMS]);
+    }
+
+    public function testListOfScalarsDocblockSchemaBuilds(): void
+    {
+        $schema = $this->schemaFor($this->listFixture(), 'names');
+
+        $this->assertSame(TypeHintResolver::ARRAY->value, $schema[TypeHintResolver::TYPE]);
+        $this->assertSame(TypeHintResolver::STRING->value, $schema[TypeHintResolver::ITEMS][TypeHintResolver::TYPE]);
+    }
+
+
+    private function listFixture(): object
+    {
+        return new class {
+            /** @var list<\Ufo\DTO\Tests\Fixtures\DTO\DummyDTO> */
+            public array $items;
+
+            /** @var non-empty-list<\Ufo\DTO\Tests\Fixtures\DTO\DummyDTO> */
+            public array $nonEmptyItems;
+
+            /** @var list<string> */
+            public array $names;
+        };
+    }
+
     private function nestedFixture(): object
     {
         return new class {

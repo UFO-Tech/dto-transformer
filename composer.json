@@ -1,6 +1,5 @@
 {
     "name": "ufo-tech/dto-transformer",
-    "version": "3.0.5",
     "description": "The library provides tools for two-way transformation of DTO objects ⇄ arrays, respecting typing, contracts, and flexible transformation logic.",
     "license": "MIT",
     "authors": [
@@ -31,10 +30,10 @@
     ],
     "homepage": "https://docs.ufo-tech.space/bin/view/docs/DTOTransformer/?language=en",
     "require": {
-        "php": ">=8.3",
+        "php": ">=8.4",
         "ext-intl": "*",
-        "symfony/serializer": "^7.2",
-        "symfony/validator": "^7.2",
+        "symfony/serializer": "^7.2|^8.0",
+        "symfony/validator": "^7.2|^8.0",
         "symfony/cache-contracts": "^3.5",
         "phpdocumentor/type-resolver": "^1.10",
         "phpdocumentor/reflection-docblock": "^5.6"
