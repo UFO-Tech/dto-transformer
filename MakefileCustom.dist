@@ -8,6 +8,9 @@ phpunit: setup
 test-filter: ARGS = --filter $(FILTER)
 test-filter: phpunit
 
+coverage: setup
+	docker run --rm -v $(CURDIR):$(WORKDIR) -w $(WORKDIR) valchik/php:8.5-fpm-dev composer test:coverage
+
 debug-config: EXEC = debug:config
 debug-config: symfony
 

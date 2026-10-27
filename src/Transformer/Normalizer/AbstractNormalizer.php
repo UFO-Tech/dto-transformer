@@ -4,14 +4,11 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Transformer\Normalizer;
 
-use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerChainInterface;
-use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerInterface;
-
-abstract class AbstractNormalizer implements PropertyNormalizerInterface
+abstract class AbstractNormalizer implements NormalizerInterface
 {
-    protected ?PropertyNormalizerChainInterface $chainNormalizer = null;
+    protected ?NormalizerChainInterface $chainNormalizer = null;
 
-    public function setChainNormalizer(PropertyNormalizerChainInterface $chainNormalization): void
+    public function setChainNormalizer(NormalizerChainInterface $chainNormalization): void
     {
         $this->chainNormalizer = $chainNormalization;
     }

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Transformer\Hydrator;
 
-use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Interfaces\Hydrator\ParamHydratorInterface;
-use Ufo\DTO\VO\TransformationContext;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
+use Ufo\DTO\Transformer\Context\TransformationContext;
 
-class MixedHydrator implements ParamHydratorInterface
+class MixedHydrator implements HydratorInterface
 {
     public function supports(array $schema): bool
     {

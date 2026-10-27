@@ -44,7 +44,10 @@
     "autoload": {
         "psr-4": {
             "Ufo\\DTO\\": "src/"
-        }
+        },
+        "files": [
+            "aliases.php"
+        ]
     },
     "autoload-dev": {
         "psr-4": {
@@ -62,6 +65,7 @@
     },
     "scripts": {
         "test": "phpunit",
+        "test:coverage": "XDEBUG_MODE=coverage phpunit --coverage-text --coverage-html build/coverage --coverage-cobertura build/coverage/coverage.xml",
         "bench": "XDEBUG_MODE=off php benchmarks/run.php"
     }
   

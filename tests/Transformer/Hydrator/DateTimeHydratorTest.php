@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace Ufo\DTO\Tests\Transformer\Hydrator;
 
 use DateTimeImmutable;
-use Ufo\DTO\Helpers\TypeHintResolver;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
+use Ufo\DTO\Transformer\Converter\DateTimeConverter;
 use Ufo\DTO\Transformer\Hydrator\DateTimeHydrator;
 
-class DateTimeHydratorTest extends ParamHydratorTestCase
+class DateTimeHydratorTest extends HydratorTestCase
 {
     public function testItSupportsDateTimeClassSchema(): void
     {
-        $resolver = $this->resolver(DateTimeHydrator::class);
+        $resolver = new DateTimeHydrator(new DateTimeConverter());
 
         $this->assertTrue($resolver->supports([
             TypeHintResolver::CLASS_FQCN => DateTimeImmutable::class,
@@ -21,7 +22,7 @@ class DateTimeHydratorTest extends ParamHydratorTestCase
 
     public function testItResolvesDateTimeValue(): void
     {
-        $resolver = $this->resolver(DateTimeHydrator::class);
+        $resolver = new DateTimeHydrator(new DateTimeConverter());
 
         $dateTime = $resolver->resolve([
             TypeHintResolver::CLASS_FQCN => DateTimeImmutable::class,

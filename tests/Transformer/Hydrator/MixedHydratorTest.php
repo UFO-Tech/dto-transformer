@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Tests\Transformer\Hydrator;
 
-use Ufo\DTO\Helpers\TypeHintResolver;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
 use Ufo\DTO\Transformer\Hydrator\MixedHydrator;
 
-final class MixedHydratorTest extends ParamHydratorTestCase
+final class MixedHydratorTest extends HydratorTestCase
 {
     public function testSupportsAnySchema(): void
     {

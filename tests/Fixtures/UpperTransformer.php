@@ -2,10 +2,10 @@
 
 namespace Ufo\DTO\Tests\Fixtures;
 
-use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
+use Ufo\DTO\Contract\StaticDTOFromArrayTransformerInterface;
 use Ufo\DTO\Tests\Fixtures\DTO\ValidDTO;
 
-class UpperTransformer implements IDTOFromArrayTransformer
+class UpperTransformer implements StaticDTOFromArrayTransformerInterface
 {
     public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object
     {

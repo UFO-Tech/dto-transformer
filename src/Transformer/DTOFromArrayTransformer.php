@@ -4,42 +4,41 @@ declare(strict_types = 1);
 
 namespace Ufo\DTO\Transformer;
 
-use InvalidArgumentException;
-use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
 use ReflectionParameter;
 use ReflectionProperty;
-use ReflectionUnionType;
-use Symfony\Component\Serializer\Attribute\Ignore;
-use Ufo\DTO\Attributes\AttrAssertions;
-use Ufo\DTO\Attributes\AttrDTO;
 use Ufo\DTO\BaseDTOFromArrayTransformer;
-use Ufo\DTO\DTOAttributesEnum;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
-use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Interfaces\DTOFromArrayTransformerInterface;
-use Ufo\DTO\Interfaces\DTOFromSmartArrayTransformerInterface;
-use Ufo\DTO\Interfaces\Hydrator\ParamHydratorChainInterface;
-use Ufo\DTO\Interfaces\Meta\ReflectionMetadataKeyGeneratorInterface;
-use Ufo\DTO\Interfaces\Meta\ReflectionMetadataProviderInterface;
-use Ufo\DTO\Interfaces\Meta\TypeSchemaResolverInterface;
-use Ufo\DTO\VO\TransformationContext;
-use Ufo\DTO\VO\TransformKeyVO;
+use Ufo\DTO\Schema\ClassSchemaProviderInterface;
+use Ufo\DTO\Schema\CompiledTypeSchema;
+use Ufo\DTO\Schema\DefaultValueResolver;
+use Ufo\DTO\Schema\PropertySchema;
+use Ufo\DTO\Schema\Type\ResolvedTypeSchema;
+use Ufo\DTO\Schema\Type\TypeSchemaResolverInterface;
+use Ufo\DTO\Transformer\Attribute\AssertionsValidator;
+use Ufo\DTO\Transformer\Attribute\AttrDTOResolver;
+use Ufo\DTO\Transformer\Context\TransformationContext;
+use Ufo\DTO\Transformer\Hydrator\CompiledTypeSchemaProviderInterface;
+use Ufo\DTO\Transformer\Hydrator\HydratorChainInterface;
+use Ufo\DTO\Transformer\Hydrator\SchemaNodeHydratorInterface;
 
-class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFromSmartArrayTransformerInterface
+use function array_key_exists;
+use function sprintf;
+
+class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFromSmartArrayTransformerInterface, DTOFromContextTransformerInterface, DTOCandidateFilterInterface
 {
-    /**
-     * @var array<string, TransformKeyVO>
-     */
-    protected array $defaultPropertyKeys = [];
-
     public function __construct(
-        protected ParamHydratorChainInterface $hydratorChain,
+        protected HydratorChainInterface $hydratorChain,
         protected TypeSchemaResolverInterface $typeSchemaResolver,
-        protected ReflectionMetadataProviderInterface $metadataProvider,
-        protected ReflectionMetadataKeyGeneratorInterface $keyGenerator,
+        protected ClassSchemaProviderInterface $schemaProvider,
+        protected CompiledTypeSchemaProviderInterface $typeSchemaProvider,
+        protected DefaultValueResolver $defaultValueResolver,
+        protected SmartClassResolver $smartClassResolver,
+        protected DTOCandidateFilterInterface $candidateFilter,
+        protected AssertionsValidator $assertionsValidator,
+        protected AttrDTOResolver $attrDTOResolver,
     ) {}
 
     /**
@@ -54,8 +53,26 @@ class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFr
         array  $context = [],
     ): object
     {
-        $context = TransformationContext::fromArray($context, namespaces: $namespaces);
-        $classFQCN = $this->resolveClassForData($classFQCN, $data, $context);
+        return $this->transformFromContext(
+            $classFQCN,
+            $data,
+            TransformationContext::fromArray($context, namespaces: $namespaces),
+            $renameKey,
+        );
+    }
+
+    /**
+     * @throws BadParamException
+     * @throws ReflectionException
+     */
+    public function transformFromContext(
+        string $classFQCN,
+        array $data,
+        TransformationContext $context,
+        array $renameKey = [],
+    ): object
+    {
+        $classFQCN = $this->smartClassResolver->resolveForData($classFQCN, $data, $context);
         return $this->hydrateClass($classFQCN, $data, $renameKey, $context);
     }
 
@@ -70,7 +87,7 @@ class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFr
             ?? throw new NotSupportDTOException('Missing class name');
 
         $context = TransformationContext::fromArray($context, namespaces: $namespaces);
-        $classFQCN = $this->resolveSmartClass($classFQCN, $context);
+        $classFQCN = $this->smartClassResolver->resolve($classFQCN, $context);
         unset($data[BaseDTOFromArrayTransformer::DTO_CLASSNAME]);
 
         return $this->hydrateClass($classFQCN, $data, $renameKey, $context);
@@ -83,61 +100,40 @@ class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFr
         TransformationContext $context,
     ): object
     {
-        $reflectionClass = $this->reflectionClass($classFQCN);
-        $declaringNamespaces = $this->metadataProvider->declaringNamespaces($reflectionClass);
-        $context = $context->withNamespaces($declaringNamespaces);
+        $schema = $this->schemaProvider->schema($classFQCN);
+        $reflectionClass = $schema->reflection;
+        $context = $context->withNamespaces($schema->declaringNamespaces);
 
-        $instance = $this->createUninitializedInstance($reflectionClass);
-        foreach ($this->reflectionProperties($reflectionClass) as $property) {
-            $this->hydrateProperty(
-                instance: $instance,
-                property: $property,
-                data: $data,
-                refClass: $reflectionClass,
-                context: $context,
-                renameKey: $renameKey
-            );
+        $instance = $reflectionClass->newInstanceWithoutConstructor();
+
+        if ($renameKey !== []) {
+            $data = $this->renameDataKeys($data, $renameKey);
+        }
+
+        $typeSchemas = $this->typeSchemaProvider->typeSchemas($schema, $context->namespaces());
+        foreach ($schema->properties as $index => $propertySchema) {
+            $this->hydrateProperty($instance, $propertySchema, $data, $reflectionClass, $context, $typeSchemas[$index] ?? null, $renameKey);
         }
 
         return $instance;
     }
 
-    protected function resolveClassForData(
-        string $classFQCN,
-        array &$data,
-        TransformationContext $context,
-    ): string
+    /**
+     * Ключі даних під іменами властивостей: значення перейменованої властивості береться з її ключа в `$renameKey`.
+     *
+     * @param array<string, string|null> $renameKey
+     */
+    protected function renameDataKeys(array $data, array $renameKey): array
     {
-        if (!isset($data[BaseDTOFromArrayTransformer::DTO_CLASSNAME])) {
-            return $classFQCN;
+        $renamed = $data;
+        foreach ($renameKey as $property => $dataKey) {
+            unset($renamed[$property]);
+            if ($dataKey !== null && array_key_exists($dataKey, $data)) {
+                $renamed[$property] = $data[$dataKey];
+            }
         }
 
-        try {
-            $classFQCN = $this->resolveSmartClass($data[BaseDTOFromArrayTransformer::DTO_CLASSNAME], $context);
-            unset($data[BaseDTOFromArrayTransformer::DTO_CLASSNAME]);
-        } catch (NotSupportDTOException) {}
-
-        return $classFQCN;
-    }
-
-    protected function resolveSmartClass(mixed $classFQCN, TransformationContext $context): string
-    {
-        if (!is_string($classFQCN)) {
-            throw new NotSupportDTOException('Smart DTO class name must be a string');
-        }
-
-        if (class_exists($classFQCN)) {
-            return $classFQCN;
-        }
-
-        $namespace = $context->namespaces()[$classFQCN] ?? $context->namespaces()[BaseDTOFromArrayTransformer::DTO_NS_KEY]
-            ?? throw new NotSupportDTOException('Namespace not found for class: ' . $classFQCN);
-
-        $classFQCN = $namespace . '\\' . $classFQCN;
-        if (!class_exists($classFQCN)) {
-            throw new NotSupportDTOException('Class not exist: ' . $classFQCN);
-        }
-        return $classFQCN;
+        return $renamed;
     }
 
     /**
@@ -145,91 +141,75 @@ class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFr
      */
     protected function hydrateProperty(
         object $instance,
-        ReflectionProperty $property,
+        PropertySchema $propertySchema,
         array $data,
         ReflectionClass $refClass,
-        ?TransformationContext $context,
+        TransformationContext $context,
+        ?CompiledTypeSchema $typeSchema = null,
         array $renameKey = [],
     ): void
     {
-        if ($this->metadataProvider->attributes($property, Ignore::class, ReflectionAttribute::IS_INSTANCEOF)) {
+        $property = $propertySchema->property;
+        $key = $propertySchema->name;
+
+        if ($propertySchema->ignored) {
             try {
-                $name = $property->getName();
-                $data[$name] = $this->getPropertyValue($name, $property, $property->getDeclaringClass());
-            } catch (\Throwable $e) {
+                $data[$key] = $this->defaultValueResolver->currentValue($propertySchema, $property->getDeclaringClass(), $key);
+            } catch (\Throwable) {
                 return;
             }
         }
 
-        $keys = $this->propertyKey($property, $renameKey);
-        $attr = $this
-            ->metadataProvider
-            ->attributes($property, AttrAssertions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
-
-        if ($attr) {
-            DTOAttributesEnum::ASSERTIONS->process(
-                $attr->newInstance(),
-                $data[$keys->dataKey] ?? [],
-                $property,
-                $this,
-            );
+        if (!array_key_exists($key, $data)) {
+            $property->setValue($instance, $this->defaultValueResolver->resolve($propertySchema, $refClass, $renameKey[$key] ?? $key));
+            return;
         }
 
-        $property->setValue($instance, $this->extractValue(
-            key: $keys->dataKey,
-            data: $data,
-            ref: $property,
-            refClass: $refClass,
-            context: $context,
-        ));
-    }
-
-    /**
-     * @throws ReflectionException
-     * @throws BadParamException
-     */
-    protected function extractValue(
-        string                                 $key,
-        array                                  $data,
-        ReflectionParameter|ReflectionProperty $ref,
-        ReflectionClass                        $refClass,
-        TransformationContext                  $context,
-    ): mixed
-    {
-        if (array_key_exists($key, $data)) {
-            $reflection = $ref instanceof ReflectionProperty && $ref->isPromoted()
-                ? $this->getPromotedConstructorParameter($ref, $refClass) ?? $ref
-                : $ref;
-
-            return $this->resolveValue($reflection, $data[$key], $context);
+        if ($propertySchema->assertions) {
+            $this->assertionsValidator->validate($propertySchema->assertions, $data[$key], $property);
         }
-        return $this->getPropertyValue($key, $ref, $refClass);
+
+        $property->setValue($instance, $this->resolvePropertyValue($propertySchema, $data[$key], $context, $typeSchema));
     }
 
     /**
      * @throws BadParamException
      */
-    protected function resolveValue(
-        ReflectionProperty|ReflectionParameter $reflection,
+    protected function resolvePropertyValue(
+        PropertySchema $propertySchema,
         mixed $value,
         TransformationContext $context,
+        ?CompiledTypeSchema $typeSchema = null,
     ): mixed
     {
-        $attributeDefinition = $this
-            ->metadataProvider
-            ->attributes($reflection, AttrDTO::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
+        $reflection = $propertySchema->valueReflection;
 
-        if ($attributeDefinition) {
-            return DTOAttributesEnum::tryFromAttr(
-                $attributeDefinition,
-                $value,
-                $reflection,
-                $this,
-                $context,
-            );
+        if ($propertySchema->attrDto) {
+            return $this->attrDTOResolver->resolve($propertySchema->attrDto, $value, $reflection, $this, $context);
         }
 
-        $resolvedSchema = $this->typeSchemaResolver->schema($reflection, $context->namespaces());
+        if ($typeSchema !== null) {
+            return $this->resolveWithSchema($reflection, $typeSchema->resolved, $value, $context, $typeSchema);
+        }
+
+        $resolved = $propertySchema->typeSource === null
+            ? $this->typeSchemaResolver->schema($reflection, $context->namespaces())
+            : $this->typeSchemaResolver->fromSource($propertySchema->typeSource, $context->namespaces());
+
+        return $this->resolveWithSchema($reflection, $resolved, $value, $context);
+    }
+
+    /**
+     * @throws BadParamException
+     */
+    protected function resolveWithSchema(
+        ReflectionProperty|ReflectionParameter $reflection,
+        ResolvedTypeSchema $resolvedSchema,
+        mixed $value,
+        TransformationContext $context,
+        ?CompiledTypeSchema $typeSchema = null,
+    ): mixed
+    {
         $schema = $resolvedSchema->schema;
 
         if (!$schema) {
@@ -237,7 +217,16 @@ class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFr
         }
 
         try {
-            return $this->hydratorChain->resolve($schema, $value, $context->withStrict($resolvedSchema->strict));
+            $context = $context->withStrict($resolvedSchema->strict);
+
+            $node = $typeSchema?->node;
+            if ($node === null) {
+                return $this->hydratorChain->resolve($schema, $value, $context);
+            }
+
+            return $node->hydrator instanceof SchemaNodeHydratorInterface
+                ? ($node->hydrator->resolveNode($node, $value, $context) ?? $value)
+                : ($node->hydrator?->resolve($schema, $value, $context) ?? $value);
         } catch (\Throwable $e) {
             if (!$resolvedSchema->strict) {
                 return $value;
@@ -258,118 +247,13 @@ class DTOFromArrayTransformer implements DTOFromArrayTransformerInterface, DTOFr
             : sprintf('%s() parameter $%s', $reflection->getDeclaringFunction()->getName(), $reflection->getName());
     }
 
-    protected function getPropertyValue(
-        string                                 $key,
-        ReflectionParameter|ReflectionProperty $ref,
-        ReflectionClass                        $refClass
-    )
-    {
-        return match (true) {
-            $ref instanceof ReflectionParameter => $ref->isOptional()
-                ? $ref->getDefaultValue()
-                : throw new InvalidArgumentException("Missing required key for constructor param: '$key'"),
-
-            $ref instanceof ReflectionProperty => (function () use ($refClass, $ref, $key) {
-                $instance = $this->createUninitializedInstance($refClass);
-                try {
-                    return $ref->getValue($instance);
-                } catch (\Throwable) {
-                    if (!$ref->isInitialized($instance)) {
-                        $constructor = $refClass->getConstructor();
-
-                        if ($constructor !== null) {
-                            $init = false;
-                            $value = null;
-                            foreach ($constructor->getParameters() as $p) {
-                                if ($init = $p->getName() === $key && $p->isOptional()) {
-                                    $value = $p->getDefaultValue();
-                                    break;
-                                }
-                            }
-                            if ($init && $this->canAssignToParameter($value, $ref)) return $value;
-
-                        }
-                    }
-                    throw new InvalidArgumentException("Missing required key for property: '$key'");
-                }
-            })(),
-
-            default => throw new InvalidArgumentException('Unsupported reflection type'),
-        };
-    }
-
-    protected function canAssignToParameter(mixed $value, ReflectionParameter|ReflectionProperty $parameter): bool
-    {
-        $type = $parameter->getType();
-
-        if ($type === null) return true;
-        if ($value === null) return $type->allowsNull();
-
-        if ($type instanceof ReflectionUnionType) {
-            foreach ($type->getTypes() as $innerType) {
-                if (TypeHintResolver::tryFrom($innerType->getName())->matchType($value) ?? false) return true;
-            }
-            return false;
-        }
-
-        return TypeHintResolver::tryFrom($type->getName())->matchType($value) ?? false;
-    }
-
-    protected function getPromotedConstructorParameter(
-        ReflectionProperty $property,
-        ReflectionClass $refClass,
-    ): ?ReflectionParameter
-    {
-        return $this->metadataProvider->promotedConstructorParameter($property, $refClass)?->reflection;
-    }
-
-    protected static function getPropertyKey(ReflectionProperty|ReflectionParameter $property, array $renameKey): TransformKeyVO
-    {
-        $dtoKey = $property->getName();
-        $dataKey = array_key_exists($dtoKey, $renameKey) ? $renameKey[$dtoKey] : $dtoKey;
-//        if ($property->getAttributes(Ignore::class)[0] ?? null) {
-//            $dataKey = null;
-//        }
-        return new TransformKeyVO($dtoKey, $dataKey);
-    }
-
-    protected function propertyKey(ReflectionProperty|ReflectionParameter $property, array $renameKey): TransformKeyVO
-    {
-        if ($renameKey !== []) {
-            return static::getPropertyKey($property, $renameKey);
-        }
-
-        $key = $property instanceof ReflectionProperty
-            ? $this->keyGenerator->propertyKey($property)
-            : $this->keyGenerator->parameterKey($property);
-
-        return $this->defaultPropertyKeys[$key] ??= new TransformKeyVO($property->getName(), $property->getName());
-    }
-
-    /**
-     * @throws ReflectionException
-     */
-    protected function createUninitializedInstance(string|ReflectionClass $class): object
-    {
-        $reflection = $class instanceof ReflectionClass ? $class : $this->reflectionClass($class);
-        return $reflection->newInstanceWithoutConstructor();
-    }
-
-    protected function reflectionClass(string $classFQCN): ReflectionClass
-    {
-        return $this->metadataProvider->classMetadata($classFQCN)->reflection;
-    }
-
-    /**
-     * @return ReflectionProperty[]
-     */
-    protected function reflectionProperties(ReflectionClass $reflection): array
-    {
-        return $this->metadataProvider->reflectionProperties($reflection);
-    }
-
     public function support(string $classFQCN): bool
     {
         return class_exists($classFQCN);
+    }
+
+    public function rejectsData(string $classFQCN, array $data, array $renameKey = []): bool
+    {
+        return $this->candidateFilter->rejectsData($classFQCN, $data, $renameKey);
     }
 }

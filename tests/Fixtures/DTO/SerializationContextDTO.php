@@ -7,9 +7,9 @@ namespace Ufo\DTO\Tests\Fixtures\DTO;
 use DateTimeImmutable;
 use DateTimeInterface;
 use Ufo\DTO\Attributes\SerializationContext;
-use Ufo\DTO\Transformer\Converter\DateTimeConverter;
 use Ufo\DTO\Tests\Fixtures\Enum\StringEnum;
-use Ufo\DTO\VO\NormalizationContext;
+use Ufo\DTO\Transformer\Context\NormalizationContext;
+use Ufo\DTO\Transformer\Converter\DateTimeConverter;
 
 class SerializationContextDTO
 {

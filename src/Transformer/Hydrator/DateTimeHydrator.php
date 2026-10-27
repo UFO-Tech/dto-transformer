@@ -5,19 +5,15 @@ declare(strict_types=1);
 namespace Ufo\DTO\Transformer\Hydrator;
 
 use Ufo\DTO\Exceptions\BadParamException;
-use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Interfaces\Converter\DateTimeValueConverterInterface;
-use Ufo\DTO\Interfaces\Hydrator\ParamHydratorInterface;
-use Ufo\DTO\Transformer\Converter\DateTimeConverter;
-use Ufo\DTO\VO\TransformationContext;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
+use Ufo\DTO\Transformer\Context\TransformationContext;
+use Ufo\DTO\Transformer\Converter\DateTimeValueConverterInterface;
 
-class DateTimeHydrator implements ParamHydratorInterface
+class DateTimeHydrator implements HydratorInterface
 {
     public function __construct(
-        protected ?DateTimeValueConverterInterface $converter = null,
-    ) {
-        $this->converter ??= new DateTimeConverter();
-    }
+        protected DateTimeValueConverterInterface $converter,
+    ) {}
 
     public function supports(array $schema): bool
     {

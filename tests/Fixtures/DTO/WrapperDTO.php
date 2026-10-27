@@ -7,11 +7,11 @@ namespace Ufo\DTO\Tests\Fixtures\DTO;
 use Ufo\DTO\ArrayConstructibleTrait;
 use Ufo\DTO\ArrayConvertibleTrait;
 use Ufo\DTO\Attributes\AttrDTO;
-use Ufo\DTO\Interfaces\IArrayConstructible;
-use Ufo\DTO\Interfaces\IArrayConvertible;
+use Ufo\DTO\Contract\ArrayConstructibleInterface;
+use Ufo\DTO\Contract\ArrayConvertibleInterface;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 
-class WrapperDTO  implements IArrayConstructible, IArrayConvertible
+class WrapperDTO  implements ArrayConstructibleInterface, ArrayConvertibleInterface
 {
     use ArrayConstructibleTrait, ArrayConvertibleTrait;
 

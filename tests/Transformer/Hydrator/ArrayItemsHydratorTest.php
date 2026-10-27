@@ -6,11 +6,11 @@ namespace Ufo\DTO\Tests\Transformer\Hydrator;
 
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\InvalidCollectionValueException;
-use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Transformer\Hydrator\ArrayItemsHydrator;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
 
-final class ArrayItemsHydratorTest extends ParamHydratorTestCase
+final class ArrayItemsHydratorTest extends HydratorTestCase
 {
     public function testSupportsArrayItemsSchema(): void
     {

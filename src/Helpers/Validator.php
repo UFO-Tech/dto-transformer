@@ -11,16 +11,20 @@ use Ufo\DTO\Exceptions\BadParamException;
 
 class Validator
 {
-
     protected function __construct(
         protected ValidatorInterface $validator,
         protected mixed $data,
         protected ConstraintViolationListInterface $errors
     ) {}
 
-    public static function validate(mixed $value, null|Constraint|array $constraints = null, null|string|GroupSequence|array $groups = null): static
+    public static function validate(
+        mixed $value,
+        null|Constraint|array $constraints = null,
+        null|string|GroupSequence|array $groups = null,
+        ?ValidatorInterface $validator = null,
+    ): static
     {
-        $validator = Validation::createValidator();
+        $validator ??= Validation::createValidator();
         $errors = $validator->validate($value, $constraints, $groups);
         return new static($validator, $value, $errors);
     }
@@ -59,14 +63,15 @@ class Validator
     }
 
     /**
-     * @param string $class
+     * @param class-string<\Throwable> $class
      * @return void
      * @throws BadParamException
+     * @throws \Throwable
      */
     public function throw(string $class = BadParamException::class): void
     {
         if ($this->hasErrors()) {
-            throw new BadParamException($this->getCurrentError());
+            throw new $class($this->getCurrentError());
         }
     }
 }

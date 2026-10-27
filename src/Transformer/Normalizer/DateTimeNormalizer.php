@@ -5,18 +5,14 @@ declare(strict_types=1);
 namespace Ufo\DTO\Transformer\Normalizer;
 
 use DateTimeInterface;
-use Ufo\DTO\Interfaces\Converter\DateTimeValueConverterInterface;
-use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerInterface;
-use Ufo\DTO\Transformer\Converter\DateTimeConverter;
-use Ufo\DTO\VO\NormalizationContext;
+use Ufo\DTO\Transformer\Context\NormalizationContext;
+use Ufo\DTO\Transformer\Converter\DateTimeValueConverterInterface;
 
-class DateTimeNormalizer implements PropertyNormalizerInterface
+class DateTimeNormalizer implements NormalizerInterface
 {
     public function __construct(
-        protected ?DateTimeValueConverterInterface $dateTimeValueConverter = null,
-    ) {
-        $this->dateTimeValueConverter ??= new DateTimeConverter();
-    }
+        protected DateTimeValueConverterInterface $dateTimeValueConverter,
+    ) {}
 
     public function supports(mixed $data, NormalizationContext $context): bool
     {

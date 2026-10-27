@@ -6,13 +6,10 @@ namespace Ufo\DTO\Transformer\Hydrator;
 
 use ReflectionClass;
 use Ufo\DTO\Exceptions\BadParamException;
-use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Interfaces\Hydrator\ParamHydratorInterface;
-use Ufo\DTO\Transformer\Traits\PayloadGuardTrait;
-use Ufo\DTO\Transformer\Traits\ValueExtractorTrait;
-use Ufo\DTO\VO\TransformationContext;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
+use Ufo\DTO\Transformer\Context\TransformationContext;
 
-class ReflectionClassHydrator implements ParamHydratorInterface
+class ReflectionClassHydrator implements HydratorInterface
 {
     use PayloadGuardTrait, ValueExtractorTrait;
 

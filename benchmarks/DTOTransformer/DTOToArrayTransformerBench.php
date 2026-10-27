@@ -4,70 +4,43 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Benchmarks\DTOTransformer;
 
-use Ufo\DTO\Benchmarks\AbstractBenchmark;
+use Closure;
+use Ufo\DTO\Benchmarks\BenchmarkInterface;
 use Ufo\DTO\Benchmarks\Fixture\BenchmarkPayloadFactory;
-use Ufo\DTO\Interfaces\DTOToArrayTransformerInterface;
+use Ufo\DTO\Benchmarks\Fixture\FixtureAssertions;
+use Ufo\DTO\Benchmarks\Fixture\TransformerGraph;
 
-final class DTOToArrayTransformerBench extends AbstractBenchmark
+final readonly class DTOToArrayTransformerBench implements BenchmarkInterface
 {
-    /**
-     * @var int[]
-     */
-    private const array DATASETS = [
-        1,
-        10,
-        50,
-        100,
-        250,
-        500,
-    ];
-
-    private const int NESTED_SIZE = 5;
+    use RootDtoStepsTrait;
 
     public function __construct(
-        private readonly DTOToArrayTransformerInterface $transformer,
-        mixed $clearRuntimeState = null,
-    ) {
-        parent::__construct($clearRuntimeState);
-    }
+        private TransformerGraph $graph,
+    ) {}
 
     public function name(): string
     {
         return 'DTOToArrayTransformer::transform';
     }
 
-    public function run(): void
+    public function prepare(int $step): Closure
     {
-        foreach (self::DATASETS as $rootCount) {
-            $this->benchPayload($rootCount);
-        }
+        $dtos = BenchmarkPayloadFactory::rootDtoPayloadCollection($step, BenchmarkPayloadFactory::NESTED_SIZE);
+        $graph = $this->graph;
+
+        return static function () use ($dtos, $graph): array {
+            $transformer = $graph->toArrayTransformer();
+            $arrays = [];
+            foreach ($dtos as $dto) {
+                $arrays[] = $transformer->transformToArray($dto);
+            }
+
+            return $arrays;
+        };
     }
 
-    private function benchPayload(int $rootCount): void
+    public function verify(int $step, mixed $result): void
     {
-        $payloads = BenchmarkPayloadFactory::rootDtoPayloadCollection(
-            rootCount: $rootCount,
-            nestedSize: self::NESTED_SIZE,
-        );
-        $transformer = $this->transformer;
-
-        $result = $this->measure(
-            callback: static function () use ($payloads, $transformer): void {
-                foreach ($payloads as $dto) {
-                    $transformer->transformToArray($dto);
-                }
-            },
-        );
-        $perDto = $result->avg / $rootCount;
-
-        $this->printResult(
-            scenario: sprintf('%d root DTO', $rootCount),
-            result: $result,
-            extra: [
-                'Per DTO' => $this->formatMs($perDto),
-                'Ops/sec' => $this->formatNumber(1000 / $perDto),
-            ],
-            colorizeBy: $perDto,
-        );
+        FixtureAssertions::rootArrays($result, $step);
     }
 }

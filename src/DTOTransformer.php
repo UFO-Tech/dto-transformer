@@ -2,16 +2,17 @@
 
 namespace Ufo\DTO;
 
+use Ufo\DTO\Contract\StaticDTOFromArrayTransformerInterface;
+use Ufo\DTO\Contract\StaticDTOToArrayTransformerInterface;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotInitializeException;
-use Ufo\DTO\Interfaces\DTOFromArrayTransformerInterface;
-use Ufo\DTO\Interfaces\DTOToArrayTransformerInterface;
-use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
-use Ufo\DTO\Interfaces\IDTOToArrayTransformer;
+use Ufo\DTO\Transformer\DTOCandidateFilterInterface;
+use Ufo\DTO\Transformer\DTOFromArrayTransformerInterface;
+use Ufo\DTO\Transformer\DTOToArrayTransformerInterface;
 
 use function class_exists;
 
-class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayTransformer, IDTOFromArrayTransformer
+class DTOTransformer extends BaseDTOFromArrayTransformer implements StaticDTOToArrayTransformerInterface, StaticDTOFromArrayTransformerInterface
 {
     /**
      * @var array<class-string<self>, self>
@@ -94,5 +95,13 @@ class DTOTransformer extends BaseDTOFromArrayTransformer implements IDTOToArrayT
     public static function isSupportClass(string $classFQCN): bool
     {
         return class_exists($classFQCN);
+    }
+
+    protected static function rejectsData(string $classFQCN, array $data, array $renameKey = []): bool
+    {
+        $transformer = (self::$instances[static::class] ?? null)?->fromArrayTransformer;
+
+        return $transformer instanceof DTOCandidateFilterInterface
+            && $transformer->rejectsData($classFQCN, $data, $renameKey);
     }
 }

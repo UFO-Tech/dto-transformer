@@ -4,12 +4,12 @@ namespace Ufo\DTO\Tests\Fixtures\DTO;
 
 use Ufo\DTO\ArrayConstructibleTrait;
 use Ufo\DTO\ArrayConvertibleTrait;
-use Ufo\DTO\Interfaces\IArrayConstructible;
-use Ufo\DTO\Interfaces\IArrayConvertible;
+use Ufo\DTO\Contract\ArrayConstructibleInterface;
+use Ufo\DTO\Contract\ArrayConvertibleInterface;
 
 use function time;
 
-class MemberDto implements IArrayConstructible, IArrayConvertible
+class MemberDto implements ArrayConstructibleInterface, ArrayConvertibleInterface
 {
     use ArrayConstructibleTrait;
     use ArrayConvertibleTrait;

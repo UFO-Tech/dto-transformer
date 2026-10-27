@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace Ufo\DTO\Transformer\Normalizer;
 
 use BackedEnum;
-use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerInterface;
-use Ufo\DTO\VO\NormalizationContext;
+use Ufo\DTO\Transformer\Context\NormalizationContext;
 use UnitEnum;
 
-class EnumNormalizer implements PropertyNormalizerInterface
+class EnumNormalizer implements NormalizerInterface
 {
     public function supports(mixed $data, NormalizationContext $context): bool
     {

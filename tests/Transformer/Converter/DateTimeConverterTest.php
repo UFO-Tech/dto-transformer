@@ -10,7 +10,7 @@ use DateTimeInterface;
 use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use Ufo\DTO\Exceptions\BadParamException;
-use Ufo\DTO\Helpers\TypeHintResolver;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
 use Ufo\DTO\Transformer\Converter\DateTimeConverter;
 
 class DateTimeConverterTest extends TestCase

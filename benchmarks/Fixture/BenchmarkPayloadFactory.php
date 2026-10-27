@@ -14,6 +14,13 @@ use Ufo\DTO\Tests\Fixtures\DTO\UserDto;
 
 final class BenchmarkPayloadFactory
 {
+    /**
+     * Кількість root DTO на кроках бенчмарків.
+     */
+    public const array ROOT_STEPS = [1, 10, 50, 100, 250, 500];
+
+    public const int NESTED_SIZE = 5;
+
     public static function fixtureClass(): string
     {
         return new class {

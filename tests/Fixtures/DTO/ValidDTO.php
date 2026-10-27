@@ -6,9 +6,9 @@ use Symfony\Component\Validator\Constraints\Length;
 use Symfony\Component\Validator\Constraints\NotBlank;
 use Ufo\DTO\ArrayConstructibleTrait;
 use Ufo\DTO\Attributes\AttrAssertions;
-use Ufo\DTO\Interfaces\IArrayConstructible;
+use Ufo\DTO\Contract\ArrayConstructibleInterface;
 
-class ValidDTO implements IArrayConstructible
+class ValidDTO implements ArrayConstructibleInterface
 {
     use ArrayConstructibleTrait;
 

@@ -3,13 +3,13 @@
 namespace Ufo\DTO;
 
 
+use Ufo\DTO\Contract\StaticDTOFromArrayTransformerInterface;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotInitializeException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
-use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
 
-abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer
+abstract class BaseDTOFromArrayTransformer implements StaticDTOFromArrayTransformerInterface
 {
     const string DTO_CLASSNAME = '$className';
 
@@ -31,8 +31,10 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer
     public static function fromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object
     {
         $classes = explode('|', $classFQCN);
+        $isUnion = count($classes) > 1;
 
         $badParams = [];
+        $rejected = [];
 
         foreach ($classes as $class) {
             try {
@@ -43,10 +45,23 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer
                         static::DTO_NS_KEY
                     ) ?? throw new NotSupportDTOException('Invalid class FQCN: ' . $class);
                 }
+                if ($isUnion && static::isSupportClass($class) && static::rejectsData($class, $data, $renameKey)) {
+                    $badParams[$class] = null;
+                    $rejected[] = $class;
+                    continue;
+                }
                 return static::singleFromArray($class, $data, $renameKey, $namespaces, $context);
             } catch (NotSupportDTOException|BadParamException $e) {
-                if (count($classes) === 1) throw $e;
+                if (!$isUnion) throw $e;
 
+                $badParams[$class] = $e->getMessage();
+            }
+        }
+
+        foreach ($rejected as $class) {
+            try {
+                return static::singleFromArray($class, $data, $renameKey, $namespaces, $context);
+            } catch (NotSupportDTOException|BadParamException $e) {
                 $badParams[$class] = $e->getMessage();
             }
         }
@@ -92,6 +107,14 @@ abstract class BaseDTOFromArrayTransformer implements IDTOFromArrayTransformer
         } catch (\Throwable $e) {
             throw new BadParamException($e->getMessage(), $e->getCode(), $e);
         }
+    }
+
+    /**
+     * true лише тоді, коли гідрація класу з цими даними гарантовано впаде.
+     */
+    protected static function rejectsData(string $classFQCN, array $data, array $renameKey = []): bool
+    {
+        return false;
     }
 
     abstract public static function transformFromArray(string $classFQCN, array $data, array $renameKey = [], array $namespaces = [], array $context = []): object;

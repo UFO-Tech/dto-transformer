@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Transformer\Normalizer;
 
-use Ufo\DTO\VO\NormalizationContext;
+use Ufo\DTO\Transformer\Context\NormalizationContext;
 
 class ArrayNormalizer extends AbstractNormalizer
 {
@@ -15,8 +15,7 @@ class ArrayNormalizer extends AbstractNormalizer
 
     public function normalize(mixed $data, NormalizationContext $context): array
     {
-        return array_map(function ($value) use ($context) {
-            return $this->chainNormalizer->normalize($value, $context->nextDepth());
-        }, $data);
+        $itemContext = $context->nextDepth();
+        return array_map(fn ($value) => $this->chainNormalizer->normalize($value, $itemContext), $data);
     }
 }

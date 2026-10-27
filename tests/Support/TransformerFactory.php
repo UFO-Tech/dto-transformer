@@ -4,186 +4,166 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Tests\Support;
 
+use Symfony\Component\Validator\Validation;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Ufo\DTO\DTOTransformer;
 use Ufo\DTO\Factory\DefaultDTOTransformerFactory;
 use Ufo\DTO\Factory\DefaultDTOTransformerFromArrayFactory;
 use Ufo\DTO\Factory\DefaultDTOTransformerToArrayFactory;
 use Ufo\DTO\Factory\DefaultMetadataFactory;
-use Ufo\DTO\Factory\DefaultPropertyNormalizerFactory;
-use Ufo\DTO\Interfaces\DTOFromArrayTransformerInterface;
-use Ufo\DTO\Interfaces\Hydrator\ParamHydratorChainInterface;
-use Ufo\DTO\Interfaces\Meta\ReflectionMetadataKeyGeneratorInterface;
-use Ufo\DTO\Interfaces\Meta\ReflectionMetadataProviderInterface;
-use Ufo\DTO\Interfaces\Meta\RuntimeReflectionCacheInterface;
-use Ufo\DTO\Interfaces\Meta\StrictModeResolverInterface;
-use Ufo\DTO\Interfaces\Meta\TypeSchemaResolverInterface;
-use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerChainInterface;
+use Ufo\DTO\Factory\DefaultNormalizerChainFactory;
+use Ufo\DTO\Factory\DefaultSchemaFactory;
+use Ufo\DTO\Schema\ClassSchemaProviderInterface;
+use Ufo\DTO\Schema\DefaultValueResolver;
+use Ufo\DTO\Schema\Meta\ReflectionMetadataKeyGenerator;
+use Ufo\DTO\Schema\Meta\ReflectionMetadataProviderInterface;
+use Ufo\DTO\Schema\Meta\RuntimeReflectionCache;
+use Ufo\DTO\Schema\Meta\StrictModeResolverInterface;
+use Ufo\DTO\Schema\Type\ReflectionTypeSchemaResolver;
+use Ufo\DTO\Schema\Type\TypeSchemaResolverInterface;
 use Ufo\DTO\Transformer\Converter\DateTimeConverter;
 use Ufo\DTO\Transformer\DTOFromArrayTransformer;
-use Ufo\DTO\Transformer\Hydrator\AdditionalHydrator;
-use Ufo\DTO\Transformer\Hydrator\ArrayItemsHydrator;
-use Ufo\DTO\Transformer\Hydrator\DateTimeHydrator;
-use Ufo\DTO\Transformer\Hydrator\DtoHydrator;
-use Ufo\DTO\Transformer\Hydrator\EnumParamHydrator;
-use Ufo\DTO\Transformer\Hydrator\MixedHydrator;
-use Ufo\DTO\Transformer\Hydrator\ParamHydrator;
-use Ufo\DTO\Transformer\Hydrator\ReflectionClassHydrator;
-use Ufo\DTO\Transformer\Hydrator\ReflectionParameterHydrator;
-use Ufo\DTO\Transformer\Hydrator\ReflectionPropertyHydrator;
-use Ufo\DTO\Transformer\Hydrator\ScalarParamHydrator;
-use Ufo\DTO\Transformer\Hydrator\UnionParamHydrator;
-use Ufo\DTO\Transformer\Metadata\AttributeSerializationContextProvider;
-use Ufo\DTO\Transformer\Metadata\ReflectionMetadataProvider;
-use Ufo\DTO\Transformer\Metadata\StrictModeResolver;
-use Ufo\DTO\Transformer\Type\ReflectionTypeSchemaResolver;
+use Ufo\DTO\Transformer\DTOFromArrayTransformerInterface;
+use Ufo\DTO\Transformer\Hydrator\CompiledTypeSchemaProviderInterface;
+use Ufo\DTO\Transformer\Hydrator\HydratorChain;
+use Ufo\DTO\Transformer\Hydrator\HydratorChainInterface;
+use Ufo\DTO\Transformer\Normalizer\NormalizerChainInterface;
 
 final class TransformerFactory
 {
-    public static function runtimeCache(?CacheInterface $cache = null): RuntimeReflectionCacheInterface
+    public static function runtimeCache(?CacheInterface $cache = null): RuntimeReflectionCache
     {
         return (new DefaultMetadataFactory())->createRuntimeReflectionCache($cache);
     }
 
-    public static function keyGenerator(): ReflectionMetadataKeyGeneratorInterface
+    public static function keyGenerator(): ReflectionMetadataKeyGenerator
     {
         return (new DefaultMetadataFactory())->createReflectionMetadataKeyGenerator();
     }
 
     public static function metadataProvider(
         ?CacheInterface $cache = null,
-        ?RuntimeReflectionCacheInterface $runtimeCache = null,
-        ?ReflectionMetadataKeyGeneratorInterface $keyGenerator = null,
+        ?RuntimeReflectionCache $runtimeCache = null,
     ): ReflectionMetadataProviderInterface {
-        $metadataFactory = new DefaultMetadataFactory();
-        $runtimeCache ??= $metadataFactory->createRuntimeReflectionCache($cache);
-        $keyGenerator ??= $metadataFactory->createReflectionMetadataKeyGenerator();
-
-        return new ReflectionMetadataProvider(
-            $metadataFactory->createDocBlockParser($runtimeCache),
-            $keyGenerator,
-            $runtimeCache,
-        );
+        return (new DefaultMetadataFactory())->createMetadataProvider($runtimeCache ?? self::runtimeCache($cache));
     }
 
     public static function strictModeResolver(
         ?CacheInterface $cache = null,
-        ?RuntimeReflectionCacheInterface $runtimeCache = null,
+        ?RuntimeReflectionCache $runtimeCache = null,
         ?ReflectionMetadataProviderInterface $metadataProvider = null,
-        ?ReflectionMetadataKeyGeneratorInterface $keyGenerator = null,
     ): StrictModeResolverInterface {
         $runtimeCache ??= self::runtimeCache($cache);
-        $keyGenerator ??= self::keyGenerator();
-        $metadataProvider ??= self::metadataProvider(runtimeCache: $runtimeCache, keyGenerator: $keyGenerator);
+        $metadataProvider ??= self::metadataProvider(runtimeCache: $runtimeCache);
 
-        return new StrictModeResolver($metadataProvider, $keyGenerator, $runtimeCache);
+        return (new DefaultMetadataFactory())->createStrictModeResolver($metadataProvider, $runtimeCache);
     }
 
     public static function typeSchemaResolver(
         ?CacheInterface $cache = null,
         ?ReflectionMetadataProviderInterface $metadataProvider = null,
-        ?RuntimeReflectionCacheInterface $runtimeCache = null,
-        ?ReflectionMetadataKeyGeneratorInterface $keyGenerator = null,
+        ?RuntimeReflectionCache $runtimeCache = null,
     ): TypeSchemaResolverInterface {
         $runtimeCache ??= self::runtimeCache($cache);
-        $keyGenerator ??= self::keyGenerator();
-        $metadataProvider ??= self::metadataProvider(runtimeCache: $runtimeCache, keyGenerator: $keyGenerator);
-        $strictModeResolver = self::strictModeResolver(
-            runtimeCache: $runtimeCache,
-            metadataProvider: $metadataProvider,
-            keyGenerator: $keyGenerator,
-        );
+        $metadataProvider ??= self::metadataProvider(runtimeCache: $runtimeCache);
 
         return new ReflectionTypeSchemaResolver(
-            $strictModeResolver,
+            self::strictModeResolver(runtimeCache: $runtimeCache, metadataProvider: $metadataProvider),
             $metadataProvider,
-            $keyGenerator,
-            $runtimeCache,
         );
     }
 
-    public static function propertyNormalizer(
+    public static function schemaProvider(
         ?CacheInterface $cache = null,
         ?ReflectionMetadataProviderInterface $metadataProvider = null,
-        ?RuntimeReflectionCacheInterface $runtimeCache = null,
-    ): PropertyNormalizerChainInterface {
-        $metadataProvider ??= self::metadataProvider($cache, $runtimeCache);
+        ?RuntimeReflectionCache $runtimeCache = null,
+    ): ClassSchemaProviderInterface {
+        $runtimeCache ??= self::runtimeCache($cache);
+        $metadataProvider ??= self::metadataProvider(runtimeCache: $runtimeCache);
 
-        return (new DefaultPropertyNormalizerFactory(
+        return (new DefaultSchemaFactory())->createClassSchemaProvider(
             $metadataProvider,
-            new AttributeSerializationContextProvider(),
+            self::typeSchemaResolver(metadataProvider: $metadataProvider, runtimeCache: $runtimeCache),
+            $cache,
+        );
+    }
+
+    public static function normalizerChain(
+        ?CacheInterface $cache = null,
+        ?ReflectionMetadataProviderInterface $metadataProvider = null,
+        ?RuntimeReflectionCache $runtimeCache = null,
+    ): NormalizerChainInterface {
+        return (new DefaultNormalizerChainFactory(
+            self::schemaProvider($cache, $metadataProvider, $runtimeCache),
             new DateTimeConverter(),
         ))->create();
     }
 
-    public static function fromArrayTransformer(iterable $transformers = []): DTOFromArrayTransformerInterface
-    {
-        $runtimeCache = self::runtimeCache();
-        $keyGenerator = self::keyGenerator();
-        $metadataProvider = self::metadataProvider(runtimeCache: $runtimeCache, keyGenerator: $keyGenerator);
+    /**
+     * Аргументи конструктора `DefaultDTOTransformerFromArrayFactory` — для тестових підкласів фабрики.
+     *
+     * @return array{TypeSchemaResolverInterface, ReflectionMetadataProviderInterface, ClassSchemaProviderInterface, ValidatorInterface, DateTimeConverter}
+     */
+    public static function fromArrayFactoryArguments(
+        ?CacheInterface $cache = null,
+        ?ValidatorInterface $validator = null,
+    ): array {
+        $runtimeCache = self::runtimeCache($cache);
+        $metadataProvider = self::metadataProvider(runtimeCache: $runtimeCache);
 
-        return (new DefaultDTOTransformerFromArrayFactory(
+        return [
             self::typeSchemaResolver(
                 metadataProvider: $metadataProvider,
                 runtimeCache: $runtimeCache,
-                keyGenerator: $keyGenerator,
             ),
             $metadataProvider,
-            $keyGenerator,
-        ))->create($transformers);
+            self::schemaProvider($cache, $metadataProvider, $runtimeCache),
+            $validator ?? Validation::createValidator(),
+            new DateTimeConverter(),
+        ];
     }
 
-    public static function paramHydrator(): ParamHydratorChainInterface
-    {
-        $runtimeCache = self::runtimeCache();
-        $keyGenerator = self::keyGenerator();
-        $metadataProvider = self::metadataProvider(runtimeCache: $runtimeCache, keyGenerator: $keyGenerator);
-        $paramHydrator = new ParamHydrator();
-        $transformer = new DTOFromArrayTransformer(
-            hydratorChain: $paramHydrator,
-            typeSchemaResolver: self::typeSchemaResolver(
-                metadataProvider: $metadataProvider,
-                runtimeCache: $runtimeCache,
-                keyGenerator: $keyGenerator,
-            ),
-            metadataProvider: $metadataProvider,
-            keyGenerator: $keyGenerator,
-        );
+    public static function fromArrayFactory(
+        ?CacheInterface $cache = null,
+        ?ValidatorInterface $validator = null,
+    ): DefaultDTOTransformerFromArrayFactory {
+        return new DefaultDTOTransformerFromArrayFactory(...self::fromArrayFactoryArguments($cache, $validator));
+    }
 
-        return $paramHydrator->addHydrators([
-            new UnionParamHydrator(),
-            new EnumParamHydrator(),
-            new ScalarParamHydrator(),
-            new ReflectionClassHydrator(),
-            new ReflectionParameterHydrator(),
-            new ReflectionPropertyHydrator(),
-            new DateTimeHydrator(),
-            new DtoHydrator($transformer),
-            new ArrayItemsHydrator(),
-            new AdditionalHydrator(),
-            new MixedHydrator(),
-        ]);
+    public static function fromArrayTransformer(iterable $transformers = []): DTOFromArrayTransformerInterface
+    {
+        return self::fromArrayFactory()->create($transformers);
+    }
+
+    public static function hydratorChain(): HydratorChainInterface
+    {
+        $factory = new class (...self::fromArrayFactoryArguments()) extends DefaultDTOTransformerFromArrayFactory {
+            public ?HydratorChain $chain = null;
+
+            protected function createTransformer(
+                HydratorChain $chain,
+                CompiledTypeSchemaProviderInterface $typeSchemaProvider,
+                DefaultValueResolver $defaultValueResolver,
+            ): DTOFromArrayTransformer {
+                $this->chain = $chain;
+
+                return parent::createTransformer($chain, $typeSchemaProvider, $defaultValueResolver);
+            }
+        };
+        $factory->create();
+
+        return $factory->chain;
     }
 
     public static function transformer(): DTOTransformer
     {
-        $runtimeCache = self::runtimeCache();
-        $keyGenerator = self::keyGenerator();
-        $metadataProvider = self::metadataProvider(runtimeCache: $runtimeCache, keyGenerator: $keyGenerator);
-
-        $fromArrayFactory = new DefaultDTOTransformerFromArrayFactory(
-            self::typeSchemaResolver(
-                metadataProvider: $metadataProvider,
-                runtimeCache: $runtimeCache,
-                keyGenerator: $keyGenerator,
-            ),
-            $metadataProvider,
-            $keyGenerator,
-        );
+        $arguments = self::fromArrayFactoryArguments();
+        [, , $schemaProvider] = $arguments;
+        $fromArrayFactory = new DefaultDTOTransformerFromArrayFactory(...$arguments);
         $toArrayFactory = new DefaultDTOTransformerToArrayFactory(
-            new DefaultPropertyNormalizerFactory(
-                $metadataProvider,
-                new AttributeSerializationContextProvider(),
+            new DefaultNormalizerChainFactory(
+                $schemaProvider,
                 new DateTimeConverter(),
             ),
         );

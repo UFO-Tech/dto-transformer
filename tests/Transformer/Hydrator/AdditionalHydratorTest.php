@@ -6,11 +6,13 @@ namespace Ufo\DTO\Tests\Transformer\Hydrator;
 
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\InvalidObjectValueException;
-use Ufo\DTO\Helpers\TypeHintResolver;
 use Ufo\DTO\Transformer\Hydrator\AdditionalHydrator;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
+use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO2;
+use Ufo\DTO\Tests\Support\TransformerFactory;
 
-final class AdditionalHydratorTest extends ParamHydratorTestCase
+final class AdditionalHydratorTest extends HydratorTestCase
 {
     public function testSupportsAdditionalPropertiesSchema(): void
     {
@@ -62,6 +64,33 @@ final class AdditionalHydratorTest extends ParamHydratorTestCase
             ['first' => ['name' => 'missing-id']],
             $this->context(strict: true),
         );
+    }
+
+    public function testSmartObjectSchemasFromPayloadAreNotCached(): void
+    {
+        $chain = TransformerFactory::hydratorChain();
+        $hydrator = new AdditionalHydrator();
+        $hydrator->setChainHydrator($chain);
+        $schema = [
+            TypeHintResolver::TYPE => TypeHintResolver::OBJECT->value,
+            TypeHintResolver::ADDITIONAL_PROPERTIES => true,
+        ];
+        $cache = new \ReflectionProperty($chain, 'nodeBySchema');
+
+        $first = $hydrator->resolve($schema, ['$className' => DummyDTO::class] + self::DUMMY_DATA, $this->context());
+        $before = count($cache->getValue($chain));
+        $second = $hydrator->resolve($schema, ['$className' => DummyDTO2::class] + self::DUMMY_DATA, $this->context());
+
+        for ($i = 0; $i < 50; $i++) {
+            try {
+                $hydrator->resolve($schema, ['$className' => 'NoSuch\\Payload' . $i] + self::DUMMY_DATA, $this->context());
+            } catch (\Throwable) {
+            }
+        }
+
+        $this->assertInstanceOf(DummyDTO::class, $first);
+        $this->assertInstanceOf(DummyDTO2::class, $second);
+        $this->assertSame($before, count($cache->getValue($chain)));
     }
 
     private function schema(): array

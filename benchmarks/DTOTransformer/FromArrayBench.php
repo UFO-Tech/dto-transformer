@@ -4,71 +4,39 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Benchmarks\DTOTransformer;
 
-use Ufo\DTO\Benchmarks\AbstractBenchmark;
+use Closure;
+use Ufo\DTO\Benchmarks\BenchmarkInterface;
 use Ufo\DTO\Benchmarks\Fixture\BenchmarkPayloadFactory;
+use Ufo\DTO\Benchmarks\Fixture\FixtureAssertions;
 use Ufo\DTO\DTOTransformer;
 
-final class FromArrayBench extends AbstractBenchmark
+final class FromArrayBench implements BenchmarkInterface
 {
-    protected const float GOOD_THRESHOLD = 8.0;
-    protected const float WARNING_THRESHOLD = 15.0;
-
-    /**
-     * @var int[]
-     */
-    private const array DATASETS = [
-        1,
-        10,
-        50,
-        100,
-        250,
-        500,
-    ];
-
-    private const int NESTED_SIZE = 5;
+    use RootDtoStepsTrait;
 
     public function name(): string
     {
         return 'DTOTransformer::fromArray';
     }
 
-    public function run(): void
+    public function prepare(int $step): Closure
     {
-        foreach (self::DATASETS as $rootCount) {
-            $this->benchPayload($rootCount);
-        }
-    }
-
-    private function benchPayload(int $rootCount): void
-    {
-        $payloads = BenchmarkPayloadFactory::rootArrayPayloadCollection(
-            rootCount: $rootCount,
-            nestedSize: self::NESTED_SIZE,
-        );
+        $payloads = BenchmarkPayloadFactory::rootArrayPayloadCollection($step, BenchmarkPayloadFactory::NESTED_SIZE);
         $fixtureClass = BenchmarkPayloadFactory::fixtureClass();
         $namespaces = BenchmarkPayloadFactory::namespaces();
 
-        $result = $this->measure(
-            callback: static function () use ($payloads, $fixtureClass, $namespaces): void {
-                foreach ($payloads as $payload) {
-                    DTOTransformer::fromArray(
-                        $fixtureClass,
-                        $payload,
-                        namespaces: $namespaces,
-                    );
-                }
-            },
-        );
-        $perDto = $result->avg / $rootCount;
+        return static function () use ($payloads, $fixtureClass, $namespaces): array {
+            $dtos = [];
+            foreach ($payloads as $payload) {
+                $dtos[] = DTOTransformer::fromArray($fixtureClass, $payload, namespaces: $namespaces);
+            }
 
-        $this->printResult(
-            scenario: sprintf('%d root DTO', $rootCount),
-            result: $result,
-            extra: [
-                'Per DTO' => $this->formatMs($perDto),
-                'Ops/sec' => $this->formatNumber(1000 / $perDto),
-            ],
-            colorizeBy: $perDto,
-        );
+            return $dtos;
+        };
+    }
+
+    public function verify(int $step, mixed $result): void
+    {
+        FixtureAssertions::rootDtos($result, $step);
     }
 }

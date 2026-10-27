@@ -7,17 +7,14 @@ use Ufo\DTO\BaseDTOFromArrayTransformer;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Exceptions\NotInitializeException;
 use Ufo\DTO\Exceptions\NotSupportDTOException;
-use Ufo\DTO\Helpers\TypeHintResolver;
-use Ufo\DTO\Interfaces\DTOToArrayTransformerInterface;
-use Ufo\DTO\Interfaces\IDTOFromArrayTransformer;
-use Ufo\DTO\Interfaces\IDTOToArrayTransformer;
-use Ufo\DTO\Interfaces\Meta\ReflectionMetadataKeyGeneratorInterface;
-use Ufo\DTO\Interfaces\Meta\ReflectionMetadataProviderInterface;
-use Ufo\DTO\Interfaces\Meta\TypeSchemaResolverInterface;
-use Ufo\DTO\Interfaces\Normalizer\PropertyNormalizerChainInterface;
+use Ufo\DTO\Schema\Meta\ReflectionMetadataKeyGenerator;
+use Ufo\DTO\Schema\Meta\ReflectionMetadataProvider;
+use Ufo\DTO\Schema\Type\TypeHintResolver;
+use Ufo\DTO\Schema\Type\TypeSchemaResolverInterface;
+use Ufo\DTO\Transformer\Context\NormalizationContext;
+use Ufo\DTO\Transformer\Context\TransformKey;
 use Ufo\DTO\Transformer\DTOFromArrayTransformer;
-use Ufo\DTO\VO\NormalizationContext;
-use Ufo\DTO\VO\TransformKeyVO;
+use Ufo\DTO\Transformer\Normalizer\NormalizerChainInterface;
 
 use function array_key_exists;
 use function class_exists;
@@ -30,7 +27,7 @@ use function str_contains;
 class DTOToArrayTransformer implements DTOToArrayTransformerInterface
 {
     public function __construct(
-        protected PropertyNormalizerChainInterface $propertyNormalizer
+        protected NormalizerChainInterface $propertyNormalizer
     ) {}
 
     /**

@@ -26,7 +26,7 @@ class ServiceTransformer extends DTOTransformer
     public static function toArray(object $dto, array $renameKey = [], bool $asSmartArray = true, bool $publicOnly = true, array $context = []): array
     {
         $self = static::getInstance();
-        $self->transformToArray($dto, $renameKey, $asSmartArray, $publicOnly);
+        $array = $self->transformToArray($dto, $renameKey, $asSmartArray, $publicOnly, $context);
         $array['$classFQCN'] = $dto::class;
         return $array;
     }

@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace Ufo\DTO\Factory;
 
-use Ufo\DTO\Interfaces\DTOToArrayTransformerInterface;
-use Ufo\DTO\Interfaces\Factory\DTOTransformerToArrayFactoryInterface;
-use Ufo\DTO\Interfaces\Factory\PropertyNormalizerFactoryInterface;
 use Ufo\DTO\Transformer\DTOToArrayTransformer;
+use Ufo\DTO\Transformer\DTOToArrayTransformerInterface;
 
 class DefaultDTOTransformerToArrayFactory implements DTOTransformerToArrayFactoryInterface
 {
     public function __construct(
-        protected PropertyNormalizerFactoryInterface $propertyNormalizerFactory,
+        protected NormalizerChainFactoryInterface $propertyNormalizerFactory,
     ) {}
 
     public function create(): DTOToArrayTransformerInterface

@@ -6,9 +6,9 @@ namespace Ufo\DTO\Tests\Transformer\Converter;
 
 use PHPUnit\Framework\TestCase;
 use Ufo\DTO\Exceptions\InvalidEnumValueException;
-use Ufo\DTO\Transformer\Converter\EnumConverter;
 use Ufo\DTO\Tests\Fixtures\Enum\TestBackedEnum;
 use Ufo\DTO\Tests\Fixtures\Enum\TestNonBackedEnum;
+use Ufo\DTO\Transformer\Converter\EnumConverter;
 
 final class EnumConverterTest extends TestCase
 {
