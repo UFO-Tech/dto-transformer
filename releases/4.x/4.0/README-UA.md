@@ -194,6 +194,8 @@ Validator::validate('', [new NotBlank()])->throw(DomainException::class); // Dom
 Validator::validate('', [new NotBlank()])->throw();                       // BadParamException
 ```
 
+- **4.0.1**: `DateTimeConverter::DEFAULT_FORMAT` — це `DateTimeInterface::ATOM` (`2026-12-31T10:00:00+00:00`) замість `Y-m-d H:i:s`, тож `toArray()` зберігає часовий пояс. Вхід у старому форматі, як і раніше, розбирається; явний `format` / `output_format` у `#[SerializationContext]` чи контексті, як і раніше, має пріоритет.
+
 ### Прибрано
 
 - З `Transformer\DTOFromArrayTransformer`: protected `resolveClassForData()`, `resolveSmartClass()` (→ `SmartClassResolver`), `extractValue()`, `resolveValue()` (→ `resolvePropertyValue()`, `resolveWithSchema()`), `getPropertyValue()`, `canAssignToParameter()` (→ `DefaultValueResolver`, `TypeCompatibility`), `getPromotedConstructorParameter()`, `getPropertyKey()`, `propertyKey()`, `createUninitializedInstance()`, `reflectionClass()`, `reflectionProperties()` і властивість `$defaultPropertyKeys`.
@@ -239,3 +241,4 @@ Validator::validate('', [new NotBlank()])->throw();                       // Bad
 10. **Перевірте код і тести, що залежать від старих результатів**: `toArray()` пропускає `#[Ignore]`, `ServiceTransformer::toArray()` повертає весь масив, `?DateTime` з `null` — `null`, nullable-колекція `#[AttrDTO]` з `null` — `null` (було `[]`), `#[AttrAssertions]` не спрацьовує на відсутніх ключах, відсутні перейменовані ключі беруть значення за замовчуванням, `ValueError` зберігає повідомлення.
 11. **`DTOAttributesEnum` більше немає**: код, що викликав `tryFromAttr()` / `process()`, переходить на `AttrDTOResolver::resolve()` / `AssertionsValidator::validate()` з екземпляром трансформера (статична форма `DTOTransformer::class` не підтримується). Перевірте кожен `AttrDTO::C_TRANSFORMER`: він має реалізувати `StaticDTOFromArrayTransformerInterface`, інакше гідратація тепер падає.
 11. **`Validator::throw()` враховує аргумент.** Якщо ви передаєте клас, тепер кидається саме він (раніше — завжди `BadParamException`). Код, що ловить `BadParamException` навколо такого виклику, має ловити переданий клас. Клас має приймати повідомлення першим аргументом конструктора.
+12. **4.0.1 змінює формат дат у `toArray()`** на `DATE_ATOM`. Споживач, що розбирає дати строго як `Y-m-d H:i:s`, має приймати ISO 8601 зі зсувом або повернути старий вихід через `#[SerializationContext(['output_format' => 'Y-m-d H:i:s'])]` на властивості.

@@ -193,6 +193,8 @@ Validator::validate('', [new NotBlank()])->throw(DomainException::class); // Dom
 Validator::validate('', [new NotBlank()])->throw();                       // BadParamException
 ```
 
+- **4.0.1**: `DateTimeConverter::DEFAULT_FORMAT` is `DateTimeInterface::ATOM` (`2026-12-31T10:00:00+00:00`) instead of `Y-m-d H:i:s`, so `toArray()` keeps the time zone. Input in the old format is still parsed; an explicit `format` / `output_format` in `#[SerializationContext]` or the context wins as before.
+
 ### Removed
 
 - From `Transformer\DTOFromArrayTransformer`: protected `resolveClassForData()`, `resolveSmartClass()` (→ `SmartClassResolver`), `extractValue()`, `resolveValue()` (→ `resolvePropertyValue()`, `resolveWithSchema()`), `getPropertyValue()`, `canAssignToParameter()` (→ `DefaultValueResolver`, `TypeCompatibility`), `getPromotedConstructorParameter()`, `getPropertyKey()`, `propertyKey()`, `createUninitializedInstance()`, `reflectionClass()`, `reflectionProperties()` and the `$defaultPropertyKeys` property.
@@ -238,3 +240,4 @@ Validator::validate('', [new NotBlank()])->throw();                       // Bad
 10. **Check code and tests that depend on the old outcomes**: `toArray()` skips `#[Ignore]`, `ServiceTransformer::toArray()` returns the whole array, `?DateTime` with `null` is `null`, a nullable `#[AttrDTO]` collection with `null` is `null` (was `[]`), `#[AttrAssertions]` does not fire on missing keys, renamed missing keys use defaults, `ValueError` keeps its message.
 11. **`DTOAttributesEnum` is gone**: code that called `tryFromAttr()` / `process()` uses `AttrDTOResolver::resolve()` / `AssertionsValidator::validate()` with a transformer instance (the static `DTOTransformer::class` form is not supported). Check every `AttrDTO::C_TRANSFORMER`: it must implement `StaticDTOFromArrayTransformerInterface`, otherwise hydration now fails.
 11. **`Validator::throw()` honours its argument.** If you pass a class, that class is thrown now (before it was always `BadParamException`). Code that catches `BadParamException` around such a call must catch the passed class instead. The class must accept the message as its first constructor argument.
+12. **4.0.1 changes the date format of `toArray()`** to `DATE_ATOM`. A consumer that parses dates strictly as `Y-m-d H:i:s` must accept ISO 8601 with an offset, or keep the old output with `#[SerializationContext(['output_format' => 'Y-m-d H:i:s'])]` on the property.

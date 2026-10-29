@@ -22,7 +22,7 @@ class DateTimeConverterTest extends TestCase
         $dateTime = $converter->toObject('2026-05-08 14:30:00');
 
         $this->assertInstanceOf(DateTimeImmutable::class, $dateTime);
-        $this->assertSame('2026-05-08 14:30:00', $dateTime->format(DateTimeConverter::DEFAULT_FORMAT));
+        $this->assertSame('2026-05-08 14:30:00', $dateTime->format('Y-m-d H:i:s'));
     }
 
     public function testItSupportsMultipleInputFormats(): void
@@ -66,7 +66,7 @@ class DateTimeConverterTest extends TestCase
             DateTimeConverter::CONTEXT_OUTPUT_TIMEZONE => 'Europe/Kiev',
         ]);
 
-        $this->assertSame('2026-05-08 14:00:00', $scalar);
+        $this->assertSame('2026-05-08T14:00:00+03:00', $scalar);
     }
 
     public function testItSupportsTimezoneShorthand(): void
@@ -128,11 +128,11 @@ class DateTimeConverterTest extends TestCase
     public function testItSupportsCallbackHooks(): void
     {
         $converter = new DateTimeConverter();
-        $dateTime = new DateTimeImmutable('2026-05-08 14:30:00');
+        $dateTime = new DateTimeImmutable('2026-05-08 14:30:00', new DateTimeZone('UTC'));
 
         $value = $converter->toScalar($dateTime, callback: static fn (string $value): string => $value . '.000');
 
-        $this->assertSame('2026-05-08 14:30:00.000', $value);
+        $this->assertSame('2026-05-08T14:30:00+00:00.000', $value);
     }
 
     public function testItThrowsOnInvalidDate(): void
@@ -153,6 +153,34 @@ class DateTimeConverterTest extends TestCase
         $converter->toObject('2026-05-08 14:30:00', [
             DateTimeConverter::CONTEXT_TIMEZONE => 'Invalid/Timezone',
         ]);
+    }
+
+    public function testDefaultOutputKeepsKyivOffsetInSummerAndWinter(): void
+    {
+        $converter = new DateTimeConverter();
+        $kyiv = new DateTimeZone('Europe/Kyiv');
+
+        $this->assertSame('2026-07-01T12:00:00+03:00', $converter->toScalar(new DateTimeImmutable('2026-07-01 12:00:00', $kyiv)));
+        $this->assertSame('2026-12-31T12:00:00+02:00', $converter->toScalar(new DateTimeImmutable('2026-12-31 12:00:00', $kyiv)));
+    }
+
+    public function testKyivAtomInputKeepsOffsetAndMoment(): void
+    {
+        $dateTime = new DateTimeConverter()->toObject('2026-07-01T12:00:00+03:00');
+
+        $this->assertSame('+03:00', $dateTime->getTimezone()->getName());
+        $this->assertSame(new DateTimeImmutable('2026-07-01T09:00:00Z')->getTimestamp(), $dateTime->getTimestamp());
+    }
+
+    public function testKyivDateSurvivesRoundTrip(): void
+    {
+        $converter = new DateTimeConverter();
+        $original = new DateTimeImmutable('2026-12-31 23:30:00', new DateTimeZone('Europe/Kyiv'));
+
+        $restored = $converter->toObject($converter->toScalar($original));
+
+        $this->assertSame($original->getTimestamp(), $restored->getTimestamp());
+        $this->assertSame($original->format(DateTimeInterface::ATOM), $restored->format(DateTimeInterface::ATOM));
     }
 }
 

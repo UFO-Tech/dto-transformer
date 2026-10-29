@@ -21,7 +21,7 @@ use function sprintf;
 
 class DateTimeConverter implements DateTimeValueConverterInterface
 {
-    public const string DEFAULT_FORMAT = 'Y-m-d H:i:s';
+    public const string DEFAULT_FORMAT = DateTimeInterface::ATOM;
     public const string CONTEXT_FORMAT = 'format';
     public const string CONTEXT_FORMATS = 'formats';
     public const string CONTEXT_OUTPUT_FORMAT = 'output_format';

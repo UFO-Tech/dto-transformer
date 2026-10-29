@@ -79,12 +79,22 @@ final class DTOTransformerTest extends TestCase
     public function testDateTimePropertyToArray(): void
     {
         $dto = DTOTransformer::fromArray(DateTimeDTO::class, [
-            'createdAt' => '2026-05-08 14:30:00',
+            'createdAt' => '2026-05-08T14:30:00+00:00',
         ]);
 
         $this->assertSame([
-            'createdAt' => '2026-05-08 14:30:00',
+            'createdAt' => '2026-05-08T14:30:00+00:00',
         ], DTOTransformer::toArray($dto));
+    }
+
+    public function testKyivDatePropertyKeepsOffsetBothWays(): void
+    {
+        $dto = DTOTransformer::fromArray(DateTimeDTO::class, [
+            'createdAt' => '2026-07-01T12:00:00+03:00',
+        ]);
+
+        $this->assertSame(new \DateTimeImmutable('2026-07-01T09:00:00Z')->getTimestamp(), $dto->createdAt->getTimestamp());
+        $this->assertSame(['createdAt' => '2026-07-01T12:00:00+03:00'], DTOTransformer::toArray($dto));
     }
 
     public function testDateTimePropertyToArrayUsesTransformationContext(): void

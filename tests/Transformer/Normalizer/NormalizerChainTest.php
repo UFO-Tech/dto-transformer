@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Ufo\DTO\Tests\Transformer\Normalizer;
 
 use DateTimeImmutable;
+use DateTimeZone;
 use PHPUnit\Framework\TestCase;
 use Ufo\DTO\Exceptions\BadParamException;
 use Ufo\DTO\Tests\Fixtures\DTO\DummyDTO;
@@ -74,11 +75,11 @@ class NormalizerChainTest extends TestCase
             new DateTimeNormalizer(new DateTimeConverter()),
         ]);
 
-        $value = $converter->normalize(new DateTimeImmutable('2026-05-08 14:30:00'), NormalizationContext::create(values: [
+        $value = $converter->normalize(new DateTimeImmutable('2026-05-08 14:30:00', new DateTimeZone('UTC')), NormalizationContext::create(values: [
             DateTimeConverter::CONTEXT_OUTPUT_FORMAT => DateTimeConverter::DEFAULT_FORMAT,
         ]));
 
-        $this->assertSame('2026-05-08 14:30:00', $value);
+        $this->assertSame('2026-05-08T14:30:00+00:00', $value);
     }
 
     public function testItThrowsWhenConverterIsMissing(): void
